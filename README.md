@@ -180,32 +180,6 @@ The retrieval workflow is deliberately simple:
 
 This is a manual retrieval approach. The human selects which notes to load. A production system would automate this with embeddings and vector search.
 
-## Current Status
-
-The project was built incrementally over six development days:
-
-| Day | Deliverable |
-|-----|-------------|
-| Day 1 | Vault structure, folder hierarchy, homepage, plugin setup |
-| Day 2 | Incident and runbook templates, metadata schema, naming and tagging conventions |
-| Day 3 | First 11 synthetic incident notes (INC-001 to INC-011) |
-| Day 4 | Next 10 incidents (INC-012 to INC-021) + navigation index layer |
-| Day 5 | Full runbook library (RB-001 to RB-007) |
-| Day 6 | Local LLM integration with Ollama, retrieval test script, QA validation |
-
-All six days are complete. The wiki contains 21 incidents, 7 runbooks, 2 templates, 4 navigation indexes, and a working local LLM retrieval test.
-
-## Future Improvements
-
-Potential extensions beyond the current prototype:
-
-- **Automated retrieval pipeline** — use embeddings (e.g., nomic-embed-text via Ollama) and a vector store to automatically select relevant notes for a given question
-- **Larger incident library** — expand to 50+ incidents covering more failure scenarios (network, DNS, TLS, message queue, caching)
-- **Evaluation framework** — automated scoring of LLM answers against expected responses using a test suite
-- **Obsidian plugin integration** — embed LLM queries directly in Obsidian via a community plugin or Templater script
-- **RAG pipeline** — implement a full Retrieval-Augmented Generation system with chunking, embedding, and retrieval
-- **Multi-model comparison** — test with different Ollama models (mistral, phi3, gemma2) and compare answer quality
-- **CI/CD integration** — validate wiki consistency (broken links, missing frontmatter) automatically on changes
 
 ## Usage Notes
 
