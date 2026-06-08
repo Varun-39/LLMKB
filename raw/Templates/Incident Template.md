@@ -9,7 +9,8 @@ status: <active|investigating|mitigated|resolved>
 owner: <owner-name>
 assigned-to: <on-call-engineer>
 date: <YYYY-MM-DD>
-duration: <time-to-resolve>
+duration: <total time to resolve, e.g. "2h 15m">
+detection_gap: <time between issue start and alert firing, e.g. "20m">
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
 tags:
@@ -46,6 +47,20 @@ related_incidents:
 | Duration | <HH:MM UTC → HH:MM UTC (X min)> |
 | Data loss | <none / describe extent> |
 | SLA breach | <yes/no — which SLA> |
+| Customer comms | <status page updated? when? / N/A> |
+
+## Timeline
+
+All times in UTC. Capture the chronological sequence of events.
+
+| Time (UTC) | Event |
+|------------|-------|
+| <HH:MM> | Issue began (per metrics, may predate detection) |
+| <HH:MM> | Alert fired |
+| <HH:MM> | On-call acknowledged |
+| <HH:MM> | Mitigation started |
+| <HH:MM> | Service recovered |
+| <HH:MM> | Incident closed |
 
 ## Root Cause
 
@@ -105,10 +120,16 @@ related_incidents:
 **What needs improvement:**
 - <Gap identified in monitoring, docs, or process>
 
+**Contributing factors (beyond root cause):**
+- <Environmental or process factors — e.g., alert threshold too loose, team understaffed, missing runbook>
+
 **Action items:**
-- [ ] <Concrete follow-up task with owner and due date>
-- [ ] <Concrete follow-up task with owner and due date>
-- [ ] <Concrete follow-up task with owner and due date>
+
+| Action | Owner | Due Date | Status |
+|--------|-------|----------|--------|
+| <Concrete follow-up task> | <name> | <YYYY-MM-DD> | ☐ Open |
+| <Concrete follow-up task> | <name> | <YYYY-MM-DD> | ☐ Open |
+| <Concrete follow-up task> | <name> | <YYYY-MM-DD> | ☐ Open |
 
 ## Links
 

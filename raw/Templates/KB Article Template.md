@@ -9,6 +9,7 @@ owner: <author-name>
 reviewer: <reviewer-name>
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
+last_validated: <YYYY-MM-DD — when someone last confirmed this still works>
 expires: <YYYY-MM-DD or never>
 tags:
   - kb
@@ -21,7 +22,13 @@ related_runbooks:
   - "[[RB-xxx-title]]"
 related_kb:
   - "[[KB-xxx-title]]"
+superseded_by:
+  - "[[KB-xxx-title]]"
 ---
+
+## TL;DR
+
+<Two-line answer for L1 support. State the fix in the fewest words possible. Full detail follows below.>
 
 ## Problem Statement
 
@@ -36,22 +43,33 @@ related_kb:
 | Version(s) | <app version or "all"> |
 | Platform | <Kubernetes, AWS, bare-metal> |
 
+## Prerequisites
+
+- <Required access, permissions, or tools to apply this solution>
+- <Specific tool versions if relevant>
+
 ## Root Cause / Explanation
 
 <Technical explanation of why this happens. Keep it factual and concise. Include diagrams or architecture references if helpful.>
 
 ## Solution
 
-### Option A: <primary-solution>
+### Temporary Workaround (if a permanent fix is not yet available)
+
+<Immediate steps to restore service. State clearly that this is temporary and what it depends on, e.g. "until patch X ships".>
+
+### Permanent Fix
+
+#### Option A: <primary-solution>
 
 1. <Step>
    ```bash
    <command>
    ```
-2. <Step>
+2. <Step — prose or a code block as needed>
 3. <Step>
 
-### Option B: <alternative-solution> (if applicable)
+#### Option B: <alternative-solution> (if applicable)
 
 1. <Step>
 2. <Step>

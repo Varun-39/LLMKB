@@ -2,6 +2,7 @@
 id: GR-<NNN>
 title: <guardrail-rule-name>
 type: guardrail
+version: 1.0.0
 scope: <deployment|database|infrastructure|security|operations>
 enforcement: <mandatory|advisory|automated>
 status: <active|draft|deprecated>
@@ -9,6 +10,7 @@ owner: <owner-name>
 approved_by: <approver-name>
 effective_date: <YYYY-MM-DD>
 review_date: <YYYY-MM-DD>
+next_review_date: <YYYY-MM-DD>
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
 tags:
@@ -16,6 +18,8 @@ tags:
   - <scope>
   - <technology>
   - <environment>
+triggering_incident:
+  - "[[INC-xxx-title]]"
 related_incidents:
   - "[[INC-xxx-title]]"
 ---
@@ -30,8 +34,8 @@ related_incidents:
 
 <Why this guardrail exists. Reference the incident(s) that motivated it.>
 
-- Root cause incident: [[INC-xxx-title]]
-- Business impact that triggered this rule: <brief description>
+- Triggering incident: [[INC-xxx-title]]
+- **Business justification:** <What did the triggering incident cost the business — revenue, downtime, customer trust, SLA penalties? Someone requesting an exception needs to know what they are betting against.>
 - Frequency of past violations: <how often this has gone wrong>
 
 ## Scope
@@ -47,7 +51,7 @@ related_incidents:
 
 ### What is Prohibited / Required
 
-| Allowed |  Prohibited |
+| ✅ Allowed | ❌ Prohibited |
 |-----------|--------------|
 | <permitted action> | <prohibited action> |
 | <permitted action> | <prohibited action> |

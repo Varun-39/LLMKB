@@ -10,12 +10,19 @@ effective_date: <YYYY-MM-DD>
 review_date: <YYYY-MM-DD>
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
+last_triggered: <YYYY-MM-DD or never>
 tags:
   - escalation
   - <service-area>
   - <environment>
 related_runbooks:
   - "[[RB-xxx-title]]"
+related_incidents:
+  - "[[INC-xxx-title]]"
+related_guardrails:
+  - "[[GR-xxx-title]]"
+related_kb:
+  - "[[KB-xxx-title]]"
 ---
 
 ## Purpose
@@ -32,6 +39,8 @@ related_runbooks:
 | On-call tool | <PagerDuty / Opsgenie / manual> |
 
 ## Severity Definitions
+
+<!-- Adjust these severity tiers to match your org's standard (e.g., P0/P1/P2 or Critical/High/Medium). The SEV-1..SEV-4 model below is the default for this vault. -->
 
 | Severity | Definition | Response Time | Resolution Target |
 |----------|-----------|---------------|-------------------|
@@ -135,6 +144,46 @@ These escalations happen automatically (timer-based) regardless of manual decisi
 | SEV-2 | Yes — brief summary + action items | Within 5 business days |
 | SEV-3 | Optional — at team discretion | Within 1 week |
 | SEV-4 | No | N/A |
+
+## Incident Commander Handoff
+
+When an Incident Commander (IC) is assigned (Tier 3+), the handoff and ongoing communication MUST be explicit so no one loses track of who owns the incident.
+
+### Handoff Protocol
+
+1. Outgoing owner posts in `#incident-response`: "Handing IC to @<name>. Current state: <summary>."
+2. Incoming IC acknowledges: "IC accepted by @<name>."
+3. IC pins the incident summary message and owns all status updates from this point.
+
+### Status Update Cadence
+
+| Severity | Update Frequency | Audience |
+|----------|------------------|----------|
+| SEV-1 | Every 30 min | #incident-response + exec stakeholders |
+| SEV-2 | Every 60 min | #incident-response |
+| SEV-3 | At resolution | Affected team |
+
+### Status Update Template
+
+```
+[INCIDENT UPDATE] <INC-id> — <severity>
+Status: <investigating | mitigating | monitoring | resolved>
+Impact: <current user/service impact>
+Actions: <what we're doing now>
+Next update: <time>
+IC: <name>
+```
+
+## Test Schedule
+
+Escalation paths rot when nobody tests them. Validate this document regularly.
+
+| Field | Value |
+|-------|-------|
+| Last tested | `<YYYY-MM-DD>` |
+| Next test due | `<YYYY-MM-DD>` |
+| Test method | Dry-run page through PagerDuty / tabletop exercise |
+| Test owner | `<name>` |
 
 ## Revision History
 
