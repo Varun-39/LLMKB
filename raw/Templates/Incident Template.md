@@ -27,55 +27,65 @@ related_incidents:
 
 ## Summary
 
-<What happened, when it started, what was affected, and scope of user impact.>
+<What happened, when it started, what was affected, and scope of user impact. Keep to 2–3 sentences.>
 
 ## Symptoms
 
-- <Alert name and timestamp>
-- <User-facing error or degraded behavior>
-- <Metric anomaly observed on dashboard>
+- <Alert name + timestamp that triggered investigation>
+- <User-facing error or degraded behavior observed>
+- <Metric anomaly on dashboard (be specific: metric name, value, threshold)>
+- <Downstream service impact>
 
 ## Impact
 
 | Dimension | Detail |
 |-----------|--------|
-| Users affected | <count or %> |
-| Services degraded | <list> |
-| Revenue impact | <estimate or N/A> |
-| Duration | <HH:MM UTC → HH:MM UTC> |
-| Data loss | <none / describe> |
+| Users affected | <count or percentage> |
+| Services degraded | <list of services and severity of degradation> |
+| Revenue impact | <estimated dollar amount or N/A> |
+| Duration | <HH:MM UTC → HH:MM UTC (X min)> |
+| Data loss | <none / describe extent> |
+| SLA breach | <yes/no — which SLA> |
 
 ## Root Cause
 
-1. <Hypothesis explored — ruled out>
-2. <Hypothesis explored — ruled out>
-3. **Confirmed:** <Root cause with supporting evidence>
+1. <Hypothesis explored — ruled out, with evidence>
+2. <Hypothesis explored — ruled out, with evidence>
+3. **Confirmed:** <Root cause with supporting evidence (commit hash, config change, metric correlation)>
 
 ## Diagnosis
 
-1. <Step with command/output>
+<Ordered steps taken to isolate the root cause. Include commands and their output.>
+
+1. <Diagnostic step>
+   ```bash
+   <command>
+   # <relevant output>
+   ```
+2. <Diagnostic step>
+   ```bash
+   <command>
+   # <relevant output>
+   ```
+3. <Diagnostic step>
    ```bash
    <command>
    ```
-2. <Step with command/output>
-   ```bash
-   <command>
-   ```
-3. <Additional diagnostic action>
 
 ## Resolution
 
-1. **Mitigate:** <Immediate action to stop bleeding>
+1. **Mitigate:** <Immediate action to stop user impact>
    ```bash
    <command>
    ```
-2. **Fix:** <Action addressing root cause>
+2. **Fix:** <Action addressing the root cause>
    ```bash
    <command>
    ```
-3. **Verify:** <Confirmation service recovered>
+3. **Verify:** <Confirmation that service recovered>
    ```bash
    <command>
+   # <expected healthy output>
    ```
 
 ## Escalation
@@ -84,22 +94,32 @@ related_incidents:
 |---------|--------|---------|
 | No progress in 15 min | Page senior on-call | PagerDuty |
 | SEV-1 customer impact | Page EM + IC | #incident-response |
-| Data integrity risk | Engage DB team | #data-eng |
+| Data integrity risk | Engage DBA team | #data-eng |
 | Security suspected | Engage SecOps | #security-urgent |
 
-## Retro
+## Post-Incident Review
 
-**Went well:**
-- <Effective aspect of response>
+**What went well:**
+- <Effective aspect of the response>
 
-**Improve:**
-- <Gap identified>
+**What needs improvement:**
+- <Gap identified in monitoring, docs, or process>
 
 **Action items:**
-- [ ] <Concrete follow-up task>
-- [ ] <Concrete follow-up task>
+- [ ] <Concrete follow-up task with owner and due date>
+- [ ] <Concrete follow-up task with owner and due date>
+- [ ] <Concrete follow-up task with owner and due date>
 
 ## Links
 
 - Runbooks: [[RB-xxx-title]]
-- Related: [[INC-xxx-title]]
+- Related incidents: [[INC-xxx-title]]
+- PR/commit: <link to fix>
+- Post-mortem doc: <link if separate>
+
+## Revision History
+
+| Date | Author | Change |
+|------|--------|--------|
+| <YYYY-MM-DD> | <name> | Incident created |
+| <YYYY-MM-DD> | <name> | Resolved, post-mortem added |

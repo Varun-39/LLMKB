@@ -27,39 +27,45 @@ related_runbooks:
 
 <One sentence: what failure does this runbook address and for which service.>
 
+**Desired outcome:** <What "success" looks like after executing this runbook.>
+
 ## Scope
 
-| | |
-|---|---|
+| Attribute | Value |
+|-----------|-------|
 | **Service** | <service-name> |
 | **Environments** | <prod, staging> |
-| **Use when** | <trigger condition> |
-| **Do NOT use when** | <exclusion criteria> |
+| **Use when** | <trigger condition — alert name, symptom, metric threshold> |
+| **Do NOT use when** | <exclusion — when this runbook is the wrong choice> |
 
 ## Prerequisites
 
 - [ ] `kubectl` access to `<namespace>` confirmed
-- [ ] VPN connected
+- [ ] VPN / network access to target environment
 - [ ] Monitoring dashboard accessible
-- [ ] On-call role confirmed
+- [ ] On-call role confirmed in PagerDuty/Opsgenie
+- [ ] <Additional access or tools required>
 
 ## Required Tools
 
-| Tool | Purpose |
-|------|---------|
-| `kubectl` | Pod/deployment operations |
-| Grafana | Metric verification |
-| Cloud console | Infrastructure checks |
+| Tool | Purpose | Access Level |
+|------|---------|-------------|
+| `kubectl` | Pod/deployment operations | Cluster admin |
+| Grafana | Metric verification | Read access |
+| `psql` / DB client | Database diagnostics | Superuser (for diagnostics) |
+| <additional> | <purpose> | <level> |
 
-## Triggers
+## Trigger
 
-- Alert: `<alert-name>` fires
-- Symptom: <observable behavior>
-- Metric: <threshold breached>
+- Alert: `<alert-name>` fires in monitoring
+- Symptom: <observable behavior that should make you reach for this runbook>
+- Metric: <specific threshold — e.g., memory > 90% for 5 min>
 
 ## Triage
 
-1. Confirm alert is genuine
+<Quick checks to confirm this is the right runbook before committing to full execution.>
+
+1. Confirm the alert is genuine
    ```bash
    <verification command>
    ```
@@ -69,75 +75,102 @@ related_runbooks:
    ```
 3. Wrong symptoms? → Try [[alternative-runbook]]
 
-## Investigate
+## Investigation
 
-1. **Resource state**
-   ```bash
-   <command>
-   ```
-2. **Recent deployments**
-   ```bash
-   <command>
-   ```
-3. **Application logs**
-   ```bash
-   <command>
-   ```
-4. **Dependent services** — DB, queue, external APIs
-5. **Change correlation** — deployment pipeline, infra changes
+<Deeper diagnosis once triage confirms this is the right runbook.>
 
-## Resolve
-
-1. <Corrective action>
+1. **Check primary indicator**
+   ```bash
+   <command>
+   # What to look for: <expected vs. abnormal output>
+   ```
+2. **Check secondary indicator**
    ```bash
    <command>
    ```
-2. <Corrective action>
+3. **Correlate with recent changes**
    ```bash
    <command>
    ```
-3. <Corrective action>
-   ```bash
-   <command>
-   ```
-4. Monitor 10 min before closing
+4. **Decision point:**
+   - IF <condition A> → proceed to Mitigation Option A
+   - IF <condition B> → proceed to Mitigation Option B
+   - IF unclear → escalate (see Escalation section)
 
-## Verify
+## Mitigation
 
-- [ ] All pods Running, 0 restarts in 5 min
-- [ ] Error rate at baseline
-- [ ] No new alerts in 15 min
-- [ ] Health endpoint returns 200
+### Option A: <primary-fix-name>
+
+```bash
+<command>
+```
+
+### Option B: <secondary-fix-name>
+
+```bash
+<command>
+```
+
+### Option C: <rollback-or-scale-fix>
+
+```bash
+<command>
+```
+
+**After mitigation:** Monitor for 10–15 minutes before declaring resolved.
+
+## Verification
+
+- [ ] Service health endpoint returning 200
+- [ ] Error rate returned to baseline (< X%)
+- [ ] No new alerts in 15 minutes
+- [ ] <Metric> stable below threshold
 
 ```bash
 <health check command>
+# Expected: <healthy output>
 ```
 
 ## Rollback
 
-1. Revert deployment
+<If mitigation made things worse, how to undo each option.>
+
+1. **Undo Option A:**
    ```bash
-   kubectl rollout undo deployment/<name> -n <namespace>
+   <command>
    ```
-2. Restore previous resource config
-3. Notify #incident-response
+2. **Undo Option B:**
+   ```bash
+   <command>
+   ```
+3. Notify #incident-response: "Rollback executed — escalating."
 
 ## Escalation
 
-| Trigger | Escalate to | Channel |
-|---------|-------------|---------|
-| No fix in 30 min | Senior on-call | #incident-response |
-| SEV-1 customer impact | EM + IC | PagerDuty escalation |
-| Infra-level failure | Platform/SRE | #platform-support |
-| Security concern | SecOps | #security-urgent |
+| Trigger | Escalate To | Channel | SLA |
+|---------|-------------|---------|-----|
+| No fix in 30 min | Senior on-call | PagerDuty | 5 min response |
+| Customer-facing SEV-1 | EM + IC | #incident-response | Immediate |
+| Infrastructure-level failure | Platform/SRE | #platform-support | 10 min |
+| Security concern | SecOps | #security-urgent | Immediate |
 
-## Notes
+## Notes / Gotchas
 
-- <Caveats, known quirks, historical context>
-- Last tested: <YYYY-MM-DD>
-- Review cycle: Quarterly
+- <Common pitfall or environment-specific quirk>
+- <Edge case where this runbook behaves differently>
+- <Historical context from past incidents>
+- See also: [[INC-xxx-title]], [[RB-xxx-title]]
 
-## Links
+## Maintenance
 
-- Incidents: [[INC-xxx-title]]
-- Related: [[RB-xxx-title]]
+- **Last tested:** <YYYY-MM-DD>
+- **Review cycle:** Quarterly
+- **Next review:** <YYYY-MM-DD>
+- **Test method:** <How to validate this runbook still works — dry run, chaos test, etc.>
+
+## Revision History
+
+| Date | Author | Change |
+|------|--------|--------|
+| <YYYY-MM-DD> | <name> | Initial publication |
+| <YYYY-MM-DD> | <name> | <what changed> |
