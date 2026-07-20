@@ -1,0 +1,30 @@
+# LLMKB — pinned to versions verified working in the current environment
+# (Python 3.13.9). Reproduce with: python -m src.query "INC-009" --no-generate
+
+# --- Core pipeline: config, loading, chunking, indexing, retrieval ---
+python-dotenv==1.2.2
+PyYAML==6.0.2
+llama-index-core==0.14.22
+llama-index-embeddings-ollama==0.9.0
+llama-index-llms-ollama==0.10.1
+llama-index-vector-stores-chroma==0.5.5
+chromadb==1.5.8
+
+# --- Object storage sync (scripts/sync_to_minio.py, src/loader.py MinIO path) ---
+minio==7.2.20
+
+# --- CLI output (src/query.py, src/ingest.py, tests/evaluate*.py) ---
+rich==14.1.0
+
+# --- API server (src/server.py) ---
+fastapi==0.123.0
+pydantic==2.12.5
+uvicorn==0.38.0
+requests==2.32.5
+
+# --- Optional: cross-encoder reranker (src/query.py get_reranker()) ---
+# Not required for ingestion, ID-routing retrieval, or the FastAPI server.
+# Install only if RERANKER_ENABLED is turned on.
+# llama-index-postprocessor-sbert-rerank==0.5.0
+# sentence-transformers==5.4.1
+# torch==2.11.0
