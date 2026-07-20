@@ -1,44 +1,25 @@
-# === Obsidian internal config ===
-raw/.obsidian/
-
-# === OS junk ===
-Thumbs.db
-Desktop.ini
-.DS_Store
-*.lnk
-
-# === Editor/IDE ===
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# === Ollama / LLM artifacts ===
-*.bin
-*.gguf
-*.ggml
-models/
-.ollama/
-
-# === Temp / cache / logs ===
-*.log
-*.tmp
-*.bak
+# Environment
+.env
+venv/
+.venv/
 __pycache__/
 *.pyc
 
-# === Secrets ===
-.env
-*.pem
-*.key
-credentials.*
+# Data stores (local, regenerated from source)
+chroma_db/
+manifest.db
 
-# === Windows / OneDrive ===
-~$*
-*.~lock.*
+# MinIO data (Docker volume)
+minio_data/
 
-# === Git keep files (empty placeholders) ===
-raw/Assets/.gitkeep
-raw/Incidents/Resolved/.gitkeep
-raw/Tests/.gitkeep
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Obsidian (not needed in git for the RAG pipeline)
+.obsidian/
+wiki/.obsidian/

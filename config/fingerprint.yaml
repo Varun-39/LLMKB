@@ -1,0 +1,102 @@
+# Fingerprint normalization and classification rules.
+# Edit this file to add/tune error families or volatile-field patterns —
+# no code changes needed. Mirrors config/scoring.yaml's tune-without-redeploy pattern.
+
+version: "fp-v1"
+
+# Volatile substrings stripped/templated before hashing, in order.
+# Order matters: more specific patterns must come before generic ones
+# (bare_number would otherwise eat digits inside a timestamp or address).
+volatile_patterns:
+  - name: iso_timestamp
+    pattern: '\d{4}-\d{2}-\d{2}[t ]\d{2}:\d{2}:\d{2}(\.\d+)?(z|[+-]\d{2}:?\d{2})?'
+    replacement: "<ts>"
+  - name: uuid
+    pattern: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    replacement: "<uuid>"
+  - name: ip_addr
+    pattern: '\b\d{1,3}(\.\d{1,3}){3}(:\d+)?\b'
+    replacement: "<addr>"
+  - name: hex_id
+    pattern: '\b0x[0-9a-f]+\b'
+    replacement: "<hex>"
+  - name: instance_suffix
+    # app-02, node-3, worker-17 -> app-<n>, node-<n> (keeps the component, drops the instance)
+    pattern: '\b([a-z]+)-\d+\b'
+    replacement: '\1-<n>'
+  - name: duration
+    pattern: '\b\d+(\.\d+)?\s?(ms|sec|secs|s|min|mins|m|h|hr|hrs)\b'
+    replacement: "<dur>"
+  - name: bare_number
+    pattern: '\b\d+\b'
+    replacement: "<n>"
+
+# Frame prefixes considered "framework/stdlib" — skipped during root-frame
+# extraction from a JEE stack trace. The first frame NOT matching one of
+# these is the root_frame (the application code most likely responsible).
+framework_frame_prefixes:
+  - "java."
+  - "javax."
+  - "jakarta."
+  - "jdk."
+  - "sun."
+  - "org.springframework."
+  - "org.hibernate."
+  - "org.apache.catalina."
+  - "org.apache.tomcat."
+  - "com.zaxxer.hikari."
+  - "io.netty."
+  - "org.apache.kafka."
+  - "reactor."
+
+# Error family classification — first matching pattern wins.
+# `family` is chosen to match an existing runbook slug (see wiki/Runbooks/RB-*)
+# wherever one exists, so a fingerprint's family routes directly to the
+# approved action instead of a parallel, disconnected taxonomy.
+error_families:
+  - family: connection-pool-exhausted
+    pattern: '(connection pool|hikaripool|connection is not available|pool exhausted|remaining connection slots)'
+  - family: oom
+    pattern: '(oomkilled|out of memory|outofmemoryerror|oom[- ]?kill)'
+  - family: disk-full
+    pattern: '(no space left|disk full|filesystem full)'
+  - family: inode-exhaustion
+    pattern: '(inode.*exhaust|out of inodes)'
+  - family: crashloopbackoff
+    pattern: '(crashloopbackoff|back-off restarting failed container)'
+  - family: node-notready
+    pattern: '(nodenotready|node not ready|kubelet stopped posting)'
+  - family: high-cpu
+    pattern: '(cpu throttl|cpu.*(9[0-9]|100)\s?%|high cpu)'
+  - family: db-timeout
+    pattern: '(query timeout|statement timeout|db timeout)'
+  - family: db-lock-contention
+    pattern: '(deadlock detected|lock wait timeout|could not obtain lock)'
+  - family: db-read-replica-lag
+    pattern: '(replication lag|replica lag|read replica.*behind)'
+  - family: imagepullbackoff
+    pattern: '(imagepullbackoff|errimagepull|failed to pull image)'
+  - family: pending-pods-resource-pressure
+    pattern: '(insufficient cpu|insufficient memory|nodes are available)'
+  - family: node-disk-pressure
+    pattern: '(diskpressure|disk pressure)'
+  - family: broken-feature-flag
+    pattern: '(feature flag)'
+  - family: bad-config-rollout
+    pattern: '(config(uration)? rollout|bad config|invalid configuration applied)'
+  - family: nic-saturation
+    pattern: '(nic saturat|network.*saturat|bandwidth.*exceed)'
+  - family: dns-nxdomain
+    pattern: '(nxdomain|dns resolution fail|could not resolve host)'
+  - family: kafka-consumer-rebalance
+    pattern: '(consumer lag|rebalance storm|kafka.*rebalanc)'
+  - family: tls-cert-expiry
+    pattern: '(certificate.*expir|tls handshake.*fail|x509.*expired)'
+  - family: terraform-state-lock
+    pattern: '(state lock|error acquiring the state lock)'
+  - family: vault-seal
+    pattern: '(vault is sealed|vault.*seal)'
+  - family: release-rollback-failure
+    pattern: '(rollback failed|canary.*fail|deployment.*rollback.*fail)'
+  - family: memory-pressure
+    pattern: '(memory pressure|memory leak|goroutine leak)'

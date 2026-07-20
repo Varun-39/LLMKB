@@ -1,0 +1,118 @@
+# Multi-signal scoring configuration.
+# Edit this file to tune ranking behavior — no code changes needed.
+# Loaded once at startup.
+
+# Weights for combining retrieval signals (should sum to ~1.0)
+weights:
+  rrf: 0.55               # rank fusion agreement between dense and BM25
+  exact_match: 0.13       # query text found in node text (BM25 / token overlap)
+  metadata_match: 0.13    # service in query matches node metadata
+  section_relevance: 0.09 # section type matches query intent
+  doc_type_priority: 0.10 # source authority tier (runbook > incident > system > informal)
+
+# Penalty for low-information sections
+penalties:
+  low_value_sections:
+    - links
+    - revision-history
+    - revision-history-0
+    - preamble
+    - additional-notes
+  penalty_amount: 0.20    # subtract this from final score
+
+# Retrieval / routing thresholds
+thresholds:
+  id_lookup_regex: "^[A-Z]{2,5}-\\d{1,4}$"  # detects INC-003, RB-001, SYS-002
+  candidate_multiplier: 8  # retrieve top_k * this, then rerank down to top_k
+  min_candidate_count: 50  # floor for reranking depth
+  rrf_k: 60               # reciprocal rank fusion constant
+
+# Scoring behavior
+scoring:
+  normalize_rrf: true
+  minmax_normalize_final: false
+  attach_explanations: true
+
+# Query intent keywords
+intent_keywords:
+  action:
+    - fix
+    - resolve
+    - how
+    - steps
+    - runbook
+    - recover
+    - mitigate
+    - remediate
+    - troubleshoot
+    - restart
+    - scale
+  info:
+    - what
+    - happened
+    - caused
+    - when
+    - why
+    - who
+    - timeline
+    - summary
+
+# Section names considered relevant per intent
+action_sections:
+  - resolution
+  - mitigation
+  - mitigation-option-a
+  - mitigation-option-b
+  - fix
+  - triage
+info_sections:
+  - summary
+  - incident-summary
+  - timeline
+  - diagnosis
+  - symptoms
+
+# Known service names (for metadata matching)
+known_services:
+  - payment-gateway
+  - payment-service
+  - auth-service
+  - api-gateway
+  - reporting-service
+  - frontend
+  - general
+  - all
+
+# Source authority tier — maps doc_type to a 0.0–1.0 priority score.
+# Priority 1 (runbooks/SOPs): exact, pre-approved action steps.
+# Priority 2 (incidents): recent historical context, post-mortems.
+# Priority 3 (system/governance): architecture docs, baseline understanding.
+# Priority 4 (vendor-note, unknown): informal clues of last resort.
+doc_type_priority:
+  runbook: 1.00
+  incident: 0.75
+  system: 0.50
+  governance: 0.40
+  vendor-note: 0.20
+  template: 0.00
+  unknown: 0.10
+
+# Document coherence boost (rewards chunks clustering from the same document)
+doc_coherence:
+  threshold: 3           # minimum chunks from same doc to trigger boost
+  boost_per_chunk: 0.03  # score bonus per chunk count
+  max_boost: 0.15        # cap on total coherence boost
+
+# Cross-encoder reranker — runs BEFORE multi-signal scoring.
+# Provides semantic relevance that heuristic signals cannot capture.
+# The reranker re-evaluates query-document pairs using a cross-encoder model,
+# then the multi-signal scorer applies SRE-domain signals on top.
+reranker:
+  enabled: true
+  model: "cross-encoder/ms-marco-MiniLM-L-2-v2"  # fast, good for CPU
+  top_n: 25              # keep top-N after reranking (before multi-signal scoring)
+
+# Auto-retrieval — LLM infers metadata filters from query text.
+# Replaces manual --service/--type/--severity CLI flags.
+auto_retrieval:
+  enabled: true

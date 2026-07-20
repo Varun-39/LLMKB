@@ -1,190 +1,349 @@
-# LLMKB — Obsidian Production Support Wiki with Local LLM
+# LLMKB — Operational Knowledge Base with RAG
 
-## Project Overview
+A structured operational knowledge base (incidents, runbooks, system docs) powered by a Retrieval-Augmented Generation pipeline using **LlamaIndex**, **Ollama**, **MinIO**, and **ChromaDB**.
 
-LLMKB is a prototype of an LLM-assisted knowledge base for production support teams. It combines three layers:
+Fully local. No API keys required. No data leaves your machine.
 
-- **Obsidian** as the wiki and documentation interface — structured Markdown notes with wikilinks, tags, YAML frontmatter, and Dataview dashboards.
-- **Markdown files** as the knowledge base — incident notes, runbooks, templates, and navigation indexes, all human-readable and version-controllable.
-- **Ollama + llama3.1** as the local LLM layer — enabling question answering grounded in wiki content without any cloud dependency.
+---
 
-The use case is straightforward: an on-call engineer or SRE can browse the wiki in Obsidian for structured documentation, or ask the local LLM natural-language questions about incidents and runbooks and receive answers sourced from the actual wiki content.
+## Table of Contents
 
-This project demonstrates that a lightweight, private, local-first knowledge retrieval workflow is achievable with open-source tools on a single Windows machine.
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [API Server](#api-server)
+- [Configuration](#configuration)
+- [Evaluation](#evaluation)
+- [Project Structure](#project-structure)
+- [How It Works](#how-it-works)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
-## Features
+---
 
-- **Obsidian-based Markdown knowledge base** — all content is plain Markdown with YAML frontmatter, fully portable and editable in any text editor
-- **Synthetic production incident library** — 21 realistic incident notes covering Kubernetes, infrastructure, database, and deployment failures
-- **Practical runbooks** — 7 step-by-step runbooks for common operational issues (OOM, disk full, high CPU, DB timeouts, failed deployments, pod crashes)
-- **Wiki navigation** — Dataview-powered indexes, category navigation, cross-link maps, and tag-based browsing
-- **Consistent metadata schema** — every note has structured YAML frontmatter queryable by Dataview
-- **Local LLM question answering** — load wiki notes as context and ask questions via Ollama's API using llama3.1
-- **Private and local workflow** — no data leaves your machine, no API keys, no cloud services required
-- **Templates** — reusable incident and runbook templates with placeholder values for fast note creation
+## Architecture
+
+```
+wiki/ (Obsidian)  →  MinIO (S3)  →  LlamaIndex Reader  →  Section NodeParser  →  ChromaDB  →  Query Engine
+  edit here          storage         parse + metadata       ## split to nodes      vectors      LlamaIndex + Ollama
+```
+
+### Pipeline Components
+
+| Layer | Technology | Role |
+|-------|-----------|------|
+| Document source | MinIO / local `wiki/` | S3-compatible object store for Markdown files |
+| Loading | Custom `BaseReader` subclasses | Parse YAML frontmatter, normalize metadata |
+| Chunking | Custom `SectionNodeParser` | Split at `##` headers — never splits mid-section |
+| Embedding | Ollama `nomic-embed-text` (768d) | Local embeddings via LlamaIndex `OllamaEmbedding` |
+| Vector store | ChromaDB (persistent) | Cosine similarity search with metadata filters |
+| Keyword search | In-memory BM25 | Full-corpus exact-term matching for IDs and rare tokens |
+| Hybrid fusion | Reciprocal Rank Fusion (RRF) | Merges dense + BM25 candidate pools |
+| Multi-signal scoring | YAML-configured scorer | Weighted combination of semantic, exact match, metadata, and section relevance |
+| Generation | Ollama `llama3.1` | Local LLM via LlamaIndex `Ollama` |
+| Orchestration | LlamaIndex `RetrieverQueryEngine` | Chains retrieval → synthesis with custom SRE prompt |
+| Delta tracking | SQLite manifest | SHA-256 hashing to skip unchanged files |
+
+---
+
+## Prerequisites
+
+- **Python 3.11+**
+- **Ollama** installed and running ([install guide](https://ollama.com))
+- **MinIO** binary (Windows: `C:\minio\minio.exe`, Linux/macOS: see [MinIO docs](https://min.io/docs/minio/linux/index.html))
+
+---
+
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone <REPOSITORY_URL>
+cd LLMKB2
+```
+
+### 2. Install Python dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Pull Ollama models
+
+```bash
+ollama pull llama3.1
+ollama pull nomic-embed-text
+```
+
+### 4. Configure environment
+
+```bash
+copy .env.example .env
+```
+
+Edit `.env` with your preferred settings (see [Configuration](#configuration)).
+
+### 5. Start MinIO
+
+```bash
+scripts\start_minio.bat
+```
+
+MinIO Console: http://localhost:9001 (default credentials: `minioadmin` / `minioadmin123`)
+
+---
+
+## Usage
+
+### Sync documents to MinIO
+
+```bash
+python scripts/sync_to_minio.py
+```
+
+### Build the index
+
+```bash
+# From MinIO (production path):
+python -m src.ingest
+
+# From local wiki/ (dev shortcut):
+python -m src.ingest --local
+
+# Force full re-index (bypasses delta tracking):
+python -m src.ingest --local --force
+```
+
+### Query (CLI)
+
+```bash
+# Single question
+python -m src.query "payment service pods are OOMKilled what should I do"
+
+# Filter by document type
+python -m src.query "how to fix connection pool exhaustion" --type runbook
+
+# Filter by service
+python -m src.query "what incidents affected auth-service" --service auth-service
+
+# Interactive mode
+python -m src.query --interactive
+
+# Retrieve only (no LLM generation)
+python -m src.query "disk full on database volume" --no-generate
+```
+
+---
+
+## API Server
+
+LLMKB2 includes a FastAPI server for persistent, low-latency access. The index loads once at startup — no cold-start penalty per request.
+
+### Start the server
+
+```bash
+uvicorn src.server:app --host 127.0.0.1 --port 8000
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/query` | Retrieve + optional generation (JSON response) |
+| `POST` | `/query/stream` | Streaming generation (Server-Sent Events) |
+| `GET` | `/health` | ChromaDB + Ollama connectivity status |
+| `POST` | `/ingest/refresh` | Re-index changed documents and reload |
+
+### Example request
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "payment service OOMKilled", "top_k": 5}'
+```
+
+### Request body (`/query`)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `question` | string | *(required)* | The query text |
+| `doc_type` | string | `null` | Filter by doc type (e.g., `runbook`, `incident`) |
+| `service` | string | `null` | Filter by service name |
+| `severity` | string | `null` | Filter by severity |
+| `top_k` | int | `8` | Number of results to retrieve |
+| `no_generate` | bool | `false` | Skip LLM generation, return retrieved chunks only |
+
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` and adjust as needed:
+
+```ini
+# Ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1
+OLLAMA_EMBED_MODEL=nomic-embed-text
+
+# MinIO
+MINIO_ENDPOINT=localhost:9000
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin123
+MINIO_BUCKET=llmkb
+MINIO_SECURE=false
+
+# ChromaDB
+CHROMA_PERSIST_DIR=./chroma_db
+
+# SQLite manifest
+MANIFEST_DB=./manifest.db
+
+# Wiki source directory
+WIKI_SOURCE_DIR=./wiki
+```
+
+### Scoring configuration
+
+Retrieval scoring weights, intent keywords, and penalties are configured in `config/scoring.yaml`. Edit this file to tune ranking behavior without code changes.
+
+Key settings:
+- **weights** — relative importance of semantic, exact match, metadata match, and section relevance signals
+- **penalties** — low-value section penalties (e.g., "links", "revision-history")
+- **thresholds** — ID-routing regex, candidate multiplier, RRF constant
+- **intent_keywords** — words that classify a query as "action" vs "info" intent
+
+---
+
+## Evaluation
+
+A retrieval evaluation harness measures quality before and after scoring changes:
+
+```bash
+# Run with default settings
+python -m tests.evaluate
+
+# Custom top-k
+python -m tests.evaluate --top-k 5
+
+# Show per-query results
+python -m tests.evaluate --verbose
+```
+
+Metrics reported:
+- **Recall@3** — was an expected document in the top 3 results?
+- **MRR** — mean reciprocal rank of the first expected document
+
+Test cases live in `tests/validation_queries.json`.
+
+---
 
 ## Project Structure
 
 ```
-LLMKB/
-├── raw/                          # Obsidian vault root
-│   ├── Incidents/
-│   │   ├── Active/               # 21 incident notes (INC-001 to INC-021)
-│   │   └── Resolved/            # Closed incidents (moved here on resolution)
-│   ├── Runbooks/                 # 7 operational runbooks (RB-001 to RB-007)
-│   ├── Templates/                # Incident and Runbook templates
-│   ├── Indexes/                  # Dataview dashboards and navigation
-│   │   ├── Incident Index.md
-│   │   ├── Runbook Index.md
-│   │   ├── Category Navigation.md
-│   │   └── Cross-Link Map.md
-│   ├── Tests/                    # Test scenarios and QA checklists
-│   ├── Assets/                   # Diagrams and screenshots
-│   ├── Production Support Wiki.md   # Homepage
-│   ├── Plugin Setup Guide.md
-│   └── Day 2 - Conventions and Usage Guide.md
-├── test-retrieval.ps1            # PowerShell script for LLM retrieval testing
-└── README.md                     # This file
+LLMKB2/
+├── wiki/                       # Markdown knowledge base (Obsidian vault)
+│   ├── Incidents/              # Incident reports
+│   ├── Runbooks/               # Operational runbooks
+│   ├── System/                 # Service documentation
+│   ├── Governance/             # Escalation rules, guardrails
+│   ├── Templates/              # Document templates (excluded from indexing)
+│   └── Vendor notes/           # Third-party tooling notes
+├── src/
+│   ├── config.py               # Configuration + LlamaIndex Settings init
+│   ├── loader.py               # MinIO/local readers (LlamaIndex BaseReader)
+│   ├── chunker.py              # Section-level NodeParser (## boundaries)
+│   ├── indexer.py              # ChromaDB VectorStoreIndex management
+│   ├── manifest.py             # SQLite delta tracking
+│   ├── ingest.py               # Ingestion pipeline (load → parse → embed → store)
+│   ├── retrieval.py            # BM25, hybrid fusion, multi-signal scoring
+│   ├── query.py                # Query engine (retrieve → rerank → generate)
+│   └── server.py               # FastAPI server (persistent warm index)
+├── config/
+│   └── scoring.yaml            # Retrieval scoring weights and tuning
+├── scripts/
+│   ├── sync_to_minio.py        # One-way wiki/ → MinIO sync
+│   └── start_minio.bat         # Start MinIO server (Windows)
+├── tests/
+│   ├── evaluate.py             # Retrieval evaluation harness (Recall@3, MRR)
+│   └── validation_queries.json # Ground-truth query/expected-doc pairs
+├── chroma_db/                  # ChromaDB persistence (gitignored)
+├── requirements.txt
+├── .env.example
+└── .gitignore
 ```
 
-## Requirements
+---
 
-| Requirement | Details |
-|-------------|---------|
-| **Obsidian** | Latest version — [download](https://obsidian.md/) |
-| **Ollama** | Latest version — [download](https://ollama.com/) |
-| **llama3.1** | Pulled via Ollama (8B parameter model, ~4.7 GB) |
-| **PowerShell** | Version 5.1+ (included with Windows 10/11) |
-| **System** | Windows 10/11, minimum 8 GB RAM (16 GB recommended for comfortable LLM inference) |
-| **Dataview plugin** | Install from Obsidian Community Plugins for dashboard functionality |
+## How It Works
 
-## Setup Instructions
+### Loading (`src/loader.py`)
 
-### 1. Get the project files
+- `MinIOMarkdownReader` loads from MinIO bucket via S3 API
+- `LocalMarkdownReader` loads from local `wiki/` directory
+- Both parse YAML frontmatter and normalize metadata (service, severity, doc_type, tags)
+- Returns LlamaIndex `Document` objects with rich metadata
 
-Clone or copy the `LLMKB` folder to your local machine.
+### Chunking (`src/chunker.py`)
 
-### 2. Install Obsidian
+- Custom `SectionNodeParser` splits at `##` header boundaries
+- Each section becomes one `TextNode` — never splits within a section
+- Preserves full "Resolution" blocks with all Mitigate/Fix/Verify steps together
+- Nodes inherit parent metadata + get `section_name` and `section_index`
 
-Download and install from [obsidian.md](https://obsidian.md/).
+### Retrieval (`src/retrieval.py`)
 
-### 3. Install and start Ollama
+- **ID routing** — queries matching a document ID pattern (e.g., `INC-003`) bypass vector search and do a direct metadata lookup
+- **BM25 keyword search** — in-memory inverted index over all nodes in ChromaDB; catches exact-term matches that dense retrieval misses
+- **Hybrid fusion** — union of dense (cosine) candidates and BM25 candidates, fused via Reciprocal Rank Fusion
+- **Multi-signal scorer** — weighted combination of semantic similarity, exact match, metadata match, and section relevance
 
-Download and install from [ollama.com](https://ollama.com/). After installation, Ollama runs as a background service automatically.
+### Indexing (`src/indexer.py`)
 
-Verify it is running:
+- Wraps ChromaDB in LlamaIndex's `ChromaVectorStore`
+- `build_index_from_documents()` — full index construction
+- `insert_nodes()` — incremental delta updates
+- `load_index()` — load existing index at query time (no re-embedding)
 
-```powershell
-ollama --version
-```
+### Querying (`src/query.py`)
 
-### 4. Pull the llama3.1 model
+- `VectorIndexRetriever` with `MetadataFilters` for service/severity/doc_type
+- Custom SRE prompt template enforces grounded answers with citations
+- `RetrieverQueryEngine` chains retrieval → synthesis
 
-```powershell
-ollama pull llama3.1
-```
+### Delta Re-indexing (`src/manifest.py`)
 
-This downloads the 8B parameter model (~4.7 GB). Wait for the download to complete.
+- SQLite stores SHA-256 hash per file
+- Only changed/new files get re-embedded on subsequent runs
+- `--force` flag bypasses manifest for full rebuild
 
-### 5. Verify the model works
+---
 
-```powershell
-ollama run llama3.1 "What is Kubernetes? Answer in one sentence."
-```
+## Troubleshooting
 
-You should receive a coherent one-sentence answer.
+| Issue | Fix |
+|-------|-----|
+| "Cannot connect to Ollama" | Run `ollama serve` |
+| "Model not found" | `ollama pull llama3.1` and `ollama pull nomic-embed-text` |
+| "No relevant chunks found" | `python -m src.ingest --local --force` |
+| MinIO connection refused | `scripts\start_minio.bat` |
+| Slow first ingest | Normal — local embedding takes a few minutes. Delta runs are fast. |
+| API server won't start | Ensure index exists (`python -m src.ingest --local` first) |
 
-## How to Open the Wiki
+---
 
-1. Open Obsidian
-2. Click **"Open folder as vault"**
-3. Navigate to and select the `raw` folder:
-   ```
-   C:\Users\Dell\OneDrive\Desktop\LLMKB\raw
-   ```
-4. When prompted, trust the vault and enable community plugins
-5. Install the **Dataview** plugin from Community Plugins (required for index dashboards)
+## Contributing
 
-Once open, you can:
+Contributions are welcome. To get started:
 
-- Start at **Production Support Wiki.md** (the homepage)
-- Browse incidents in `Incidents/Active/`
-- Read runbooks in `Runbooks/`
-- Use the indexes in `Indexes/` for filtered Dataview tables
-- Create new notes using templates from `Templates/`
-- Use the graph view to visualize connections between incidents and runbooks
+1. Fork the repository and create a feature branch.
+2. Make your changes, keeping diffs minimal and focused.
+3. Run the evaluation harness (`python -m tests.evaluate`) to ensure retrieval quality is maintained.
+4. Submit a pull request with a clear description of what changed and why.
 
-## How to Run the Retrieval Test
+Please follow the existing code style and patterns. If adding a new retrieval signal or scoring change, include before/after evaluation results in the PR description.
 
-The project includes a PowerShell script that tests the local LLM's ability to answer questions grounded in wiki content.
+---
 
-### Run the script
-
-```powershell
-cd C:\Users\Dell\OneDrive\Desktop\LLMKB
-powershell -ExecutionPolicy Bypass -File ".\test-retrieval.ps1"
-```
-
-### What the script does
-
-1. Reads two Markdown files from the vault (an incident note and a runbook)
-2. Injects their full content as context into the LLM prompt
-3. Sends three questions to llama3.1 via Ollama's `/api/chat` endpoint
-4. Prints the model's answers for manual verification
-
-The test validates that the LLM's responses are grounded in the provided wiki content rather than hallucinated from general knowledge.
-
-## Example Questions to Ask the LLM
-
-These questions can be used with the retrieval test or adapted for your own testing:
-
-**Grounded questions (answers should come from wiki content):**
-
-- What are the first checks for an OOMKilled Kubernetes pod?
-- What was the confirmed root cause of INC-001 and how long was the outage?
-- According to the runbook RB-002, what are the three mitigation options (A, B, C) for an OOMKilled pod?
-- What does the wiki say about disk space full on a database volume?
-- What is the rollback procedure for a failed Kubernetes deployment?
-- What caused the auth-service CrashLoopBackOff in INC-003?
-- What are the escalation criteria if a database connection pool is exhausted?
-
-**Anti-hallucination test (answer should be "not found in the provided documents"):**
-
-- What does the wiki say about Kafka consumer lag incidents?
-
-If the model answers the Kafka question with specific details, it is hallucinating — the wiki contains no Kafka-related incidents.
-
-## How the Local LLM Workflow Works
-
-The retrieval workflow is deliberately simple:
-
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Select 2–3     │     │  Build prompt:   │     │  Send to Ollama  │
-│  Markdown notes │ ──▶ │  system context  │ ──▶ │  /api/chat       │
-│  from vault     │     │  + user question │     │  (llama3.1)      │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                                                          │
-                                                          ▼
-                                                 ┌─────────────────┐
-                                                 │  Inspect answer: │
-                                                 │  grounded in     │
-                                                 │  wiki content?   │
-                                                 └─────────────────┘
-```
-
-1. **Select notes** — choose the incident or runbook files relevant to your question
-2. **Inject as context** — the full Markdown content becomes the system message in the chat prompt
-3. **Ask a question** — the user message contains your natural-language question
-4. **Inspect the answer** — verify the response references specific details from the provided notes (dates, commands, root causes) rather than generic knowledge
-
-This is a manual retrieval approach. The human selects which notes to load. A production system would automate this with embeddings and vector search.
-
-
-## Usage Notes
-
-- **This is a prototype/demo project.** The incident data is synthetic and the LLM integration is minimal by design.
-- **Always verify LLM responses against the source notes.** Local LLMs can still hallucinate, especially when context is large or questions are ambiguous.
-- **The workflow is local-first and privacy-friendly.** No data is sent to external services. All processing happens on your machine via Ollama.
-- **Obsidian is optional for the LLM workflow.** The retrieval script reads Markdown files directly — you don't need Obsidian open to run the LLM test. Obsidian provides the browsing and navigation experience.
-- **Model performance depends on hardware.** On systems with limited RAM, llama3.1 inference may be slow. Consider using a smaller model (e.g., `llama3.2:3b`) if response times are unacceptable.
