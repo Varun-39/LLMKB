@@ -14,7 +14,6 @@ Fully local. No API keys required. No data leaves your machine.
 - [Usage](#usage)
 - [API Server](#api-server)
 - [Configuration](#configuration)
-- [Evaluation](#evaluation)
 - [Project Structure](#project-structure)
 - [How It Works](#how-it-works)
 - [Troubleshooting](#troubleshooting)
@@ -25,8 +24,8 @@ Fully local. No API keys required. No data leaves your machine.
 ## Architecture
 
 ```
-wiki/ (Obsidian)  →  MinIO (S3)  →  LlamaIndex Reader  →  SectionNodeParser  →  ChromaDB  →  Query Engine
-  edit here          storage         parse + metadata       ## split + context     vectors      LlamaIndex + Ollama
+wiki/ (Obsidian)  →  MinIO (S3)  →  LlamaIndex Reader  →  SectionNodeParser  →  ChromaDB  →  Alert Query Engine
+  edit here          storage         parse + metadata       ## split + context     vectors      fingerprint → LlamaIndex + Ollama
 ```
 
 ### Pipeline Components
@@ -40,13 +39,13 @@ wiki/ (Obsidian)  →  MinIO (S3)  →  LlamaIndex Reader  →  SectionNodeParse
 | Vector store | ChromaDB (persistent) | Cosine similarity search with metadata filters |
 | Keyword search | In-memory BM25 | Full-corpus exact-term matching for IDs and rare tokens |
 | Hybrid fusion | Reciprocal Rank Fusion (RRF) | Merges dense + BM25 candidate pools |
-| Reranking | Cross-encoder (optional) | `ms-marco-MiniLM-L-2-v2` semantic reranking before scoring |
+| Reranking | Cross-encoder (disabled by default) | `ms-marco-MiniLM-L-2-v2`; adds ~34s one-time load + ~1.3s/query for no measurable gain over the multi-signal scorer alone — toggle via `config/scoring.yaml`'s `reranker.enabled` |
 | Multi-signal scoring | YAML-configured scorer | Weighted: RRF, exact match, metadata, section relevance, doc-type priority |
 | Generation | Ollama `llama3.1` | Local LLM via LlamaIndex `Ollama` |
 | Orchestration | LlamaIndex `RetrieverQueryEngine` | Chains retrieval → synthesis with custom SRE prompt |
 | Delta tracking | SQLite manifest | SHA-256 hashing to skip unchanged files |
-| Error fingerprinting | `src/fingerprint.py` | Deterministic alert → KB match key (no LLM) |
-| Service graph | `src/graph.py` | In-memory blast-radius and dependency analysis |
+| Error fingerprinting | `src/fingerprint.py` | Deterministic alert → KB match key (no LLM); hashes top 3 in-app stack frames, not just the first |
+| Recommendation cache | `src/recommendation_cache.py` | SQLite, keyed by fingerprint signature — repeat incidents skip retrieval + generation entirely |
 
 ---
 
@@ -130,36 +129,7 @@ python -m src.ingest --local --force
 python -m src.ingest --local --extract-metadata
 ```
 
-### Query (CLI)
-
-```bash
-# Single question
-python -m src.query "payment service pods are OOMKilled what should I do"
-
-# Direct document lookup by ID (no embedding, instant)
-python -m src.query "INC-009"
-
-# Filter by document type
-python -m src.query "how to fix connection pool exhaustion" --type runbook
-
-# Filter by service
-python -m src.query "what incidents affected auth-service" --service auth-service
-
-# Retrieve only — skip LLM generation
-python -m src.query "disk full on database volume" --no-generate
-
-# Stream response tokens as they are generated
-python -m src.query "payment service OOMKilled" --stream
-
-# Complex multi-part query (decomposes into sub-questions)
-python -m src.query "Compare INC-005 root cause with INC-008" --sub
-
-# Blast-radius: services affected if a given service goes down
-python -m src.query --blast-radius payment-gateway
-
-# Interactive mode
-python -m src.query --interactive
-```
+There is no free-text query CLI or API — the only way to get a recommendation is `POST /alert` (see below). `src/query.py` is a library module consumed by the alert pipeline, not a standalone tool.
 
 ---
 
@@ -177,42 +147,19 @@ uvicorn src.server:app --host 127.0.0.1 --port 8000
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/query` | Retrieve + optional generation (JSON response) |
-| `POST` | `/query/stream` | Streaming generation (Server-Sent Events) |
-| `POST` | `/query/sub` | Sub-question engine for complex multi-part queries |
+| `POST` | `/alert` | Demo alert intake (synthetic Splunk-webhook JSON, see `data/sample_alerts/`) → fingerprint → grounded recommendation, cached by signature |
 | `GET` | `/health` | ChromaDB + Ollama connectivity status |
 | `POST` | `/ingest/refresh` | Re-index changed documents and reload |
-| `GET` | `/graph/stats` | Service dependency graph summary |
-| `GET` | `/graph/blast-radius/{service}` | Services affected if `{service}` goes down |
-| `GET` | `/graph/service/{service}` | Incidents + runbooks associated with a service |
 
-### Example requests
+### Alert intake (demo)
+
+No live Splunk/ITRS integration yet — `/alert` takes a JSON payload shaped like a Splunk webhook alert action (see [`src/alerts.py`](src/alerts.py)). Sample payloads live in [`data/sample_alerts/`](data/sample_alerts):
 
 ```bash
-# Standard query
-curl -X POST http://localhost:8000/query \
+curl -X POST http://localhost:8000/alert \
   -H "Content-Type: application/json" \
-  -d '{"question": "payment service OOMKilled", "top_k": 5}'
-
-# Retrieve only (no generation)
-curl -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{"question": "INC-009", "no_generate": true}'
-
-# Blast radius
-curl http://localhost:8000/graph/blast-radius/payment-gateway
+  -d @data/sample_alerts/alert-connection-pool-exhausted.json
 ```
-
-### Request body (`/query`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `question` | string | *(required)* | The query text |
-| `doc_type` | string | `null` | Filter by doc type (`runbook`, `incident`, `system`) |
-| `service` | string | `null` | Filter by service name |
-| `severity` | string | `null` | Filter by severity (`SEV1`, `SEV2`, `SEV3`) |
-| `top_k` | int | `8` | Number of results to retrieve |
-| `no_generate` | bool | `false` | Skip LLM generation, return retrieved chunks only |
 
 ---
 
@@ -254,7 +201,6 @@ All retrieval scoring parameters — no code changes needed to tune:
 - **doc_type_priority** — authority tier: `runbook` (1.0) > `incident` (0.75) > `system` (0.5) > `vendor-note` (0.2)
 - **doc_coherence** — boost for documents with multiple chunks in the candidate pool
 - **reranker** — toggle cross-encoder reranking and set model/top-n
-- **auto_retrieval** — LLM-inferred metadata filters from natural language queries
 
 ### Fingerprinting (`config/fingerprint.yaml`)
 
@@ -263,47 +209,6 @@ Rules for deterministic error fingerprinting — no code changes needed:
 - **volatile_patterns** — regex substitutions to strip timestamps, UUIDs, IPs, instance numbers before hashing
 - **framework_frame_prefixes** — JVM/framework package prefixes to skip during stack trace root-frame extraction
 - **error_families** — 23 pattern-to-family mappings keyed to runbook slugs (`connection-pool-exhausted`, `oom`, `disk-full`, etc.)
-
----
-
-## Evaluation
-
-### Quick retrieval check
-
-```bash
-# Recall@3 and MRR over validation_queries.json
-python -m tests.evaluate
-
-# Custom top-k
-python -m tests.evaluate --top-k 5
-
-# Show per-query breakdown
-python -m tests.evaluate --verbose
-```
-
-### Comprehensive evaluation (v2)
-
-```bash
-# Full retrieval metrics: Hit Rate, MRR, NDCG, Precision, Recall + latency
-python -m tests.evaluate_v2
-
-# Also evaluate generation quality (faithfulness + relevancy via LLM-as-judge, slow)
-python -m tests.evaluate_v2 --with-generation
-
-# Generate synthetic eval questions from your indexed corpus
-python -m tests.evaluate_v2 --generate-synthetic 2
-
-# Save results to tests/eval_results/ for regression tracking
-python -m tests.evaluate_v2 --save
-```
-
-### Fingerprint self-check
-
-```bash
-python -m tests.test_fingerprint
-```
-
-Test cases live in `tests/validation_queries.json`. Run the harness before and after any scoring or retrieval change.
 
 ---
 
@@ -326,23 +231,26 @@ LLMKB/
 │   ├── manifest.py              # SQLite delta tracking (SHA-256 per file)
 │   ├── ingest.py                # Ingestion pipeline (load → parse → embed → store)
 │   ├── retrieval.py             # BM25, RRF hybrid fusion, multi-signal scoring
-│   ├── query.py                 # Query engine + CLI (retrieve → rerank → generate)
-│   ├── server.py                # FastAPI server (warm index, graph endpoints)
+│   ├── query.py                 # Query engine library (retrieve → rerank → generate), consumed by /alert
+│   ├── server.py                # FastAPI server: /alert, /health, /ingest/refresh
 │   ├── fingerprint.py           # Deterministic alert → signature_id (no LLM)
-│   └── graph.py                 # In-memory service dependency graph + blast-radius
+│   ├── alerts.py                # Splunk-webhook-shaped alert payload + query builder
+│   └── recommendation_cache.py  # SQLite cache, keyed by fingerprint signature_id
 ├── config/
 │   ├── scoring.yaml             # Retrieval scoring weights and tuning
 │   └── fingerprint.yaml         # Fingerprint normalization + error family rules
 ├── scripts/
 │   ├── sync_to_minio.py         # One-way wiki/ → MinIO sync
 │   └── start_minio.bat          # Start MinIO server (Windows)
+├── data/
+│   └── sample_alerts/           # Sample Splunk-webhook-shaped alert JSON payloads
 ├── tests/
-│   ├── evaluate.py              # Retrieval eval: Recall@3, MRR
-│   ├── evaluate_v2.py           # Comprehensive eval: NDCG, faithfulness, relevancy
 │   ├── test_fingerprint.py      # Fingerprint self-check (plain asserts)
-│   └── validation_queries.json  # Ground-truth query/expected-doc pairs
+│   ├── test_alerts.py           # Alert payload / query-builder tests
+│   └── test_recommendation_cache.py  # Recommendation cache tests
 ├── chroma_db/                   # ChromaDB persistence (gitignored)
 ├── manifest.db                  # SQLite delta manifest (gitignored)
+├── recommendations.db           # SQLite recommendation cache (gitignored)
 ├── requirements.txt
 ├── .env.example
 └── .gitignore
@@ -404,15 +312,6 @@ Turns a raw alert/log line (+ optional JVM stack trace) into a stable `signature
 
 Same error at different times, on different instances, collapses to the same ID. Different services never collide.
 
-### Service Graph (`src/graph.py`)
-
-Builds an in-memory property graph from ChromaDB metadata and document content — no external graph database needed. Service nodes are connected by `depends_on`, `related_to`, and `co_occurs` edges extracted from co-occurrence analysis and dependency keywords in system docs.
-
-- `affected_by(service, depth=2)` — BFS blast-radius: which services are impacted if X goes down?
-- `incidents_for(service)` / `runbooks_for(service)` — all related docs per service
-
-Exposed via CLI (`--blast-radius`) and API (`/graph/blast-radius/{service}`).
-
 ---
 
 ## Troubleshooting
@@ -427,6 +326,7 @@ Exposed via CLI (`--blast-radius`) and API (`/graph/blast-radius/{service}`).
 | API server won't start | Build the index first: `python -m src.ingest --local` |
 | Reranker not loading | Install optional deps: `pip install llama-index-postprocessor-sbert-rerank sentence-transformers` |
 | ChromaDB process hangs after ingest | Expected — ChromaDB keeps background threads alive. The ingest script force-exits cleanly. |
+| Generation takes 60-90s+ despite having a GPU | Run `ollama ps` during a query — if `PROCESSOR` shows a CPU/GPU split (e.g. `74%/26%`), the model's KV cache doesn't fit in VRAM. Check `context_window` in `src/config.py`'s `Ollama(...)` init isn't left at the LlamaIndex default (`-1`, which requests the model's full advertised context — 131072 for llama3.1). |
 
 ---
 
@@ -434,7 +334,5 @@ Exposed via CLI (`--blast-radius`) and API (`/graph/blast-radius/{service}`).
 
 1. Fork the repository and create a feature branch.
 2. Make your changes, keeping diffs minimal and focused.
-3. Run the evaluation harness (`python -m tests.evaluate`) to confirm retrieval quality is not regressed.
+3. Run `python -m tests.test_fingerprint` and the alert/cache tests (`pytest tests/test_alerts.py tests/test_recommendation_cache.py`) to confirm the alert path is not regressed.
 4. Submit a pull request with a clear description of what changed and why.
-
-For scoring or retrieval changes, include before/after evaluation results (`python -m tests.evaluate_v2 --save`) in the PR description.

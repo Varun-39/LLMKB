@@ -34,6 +34,12 @@ volatile_patterns:
 # Frame prefixes considered "framework/stdlib" — skipped during root-frame
 # extraction from a JEE stack trace. The first frame NOT matching one of
 # these is the root_frame (the application code most likely responsible).
+# Number of in-app stack frames to hash into the signature (Sentry-style: using
+# only the first frame lets two unrelated bugs that both pass through one shared
+# utility method collide into the same signature). root_frame (singular, used for
+# display/query text) is still just the first of these.
+root_frame_limit: 3
+
 framework_frame_prefixes:
   - "java."
   - "javax."

@@ -108,7 +108,7 @@ doc_coherence:
 # The reranker re-evaluates query-document pairs using a cross-encoder model,
 # then the multi-signal scorer applies SRE-domain signals on top.
 reranker:
-  enabled: true
+  enabled: false
   model: "cross-encoder/ms-marco-MiniLM-L-2-v2"  # fast, good for CPU
   top_n: 25              # keep top-N after reranking (before multi-signal scoring)
 

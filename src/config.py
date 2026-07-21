@@ -30,6 +30,9 @@ CHROMA_COLLECTION = "llmkb_docs"
 # --- SQLite Manifest ---
 MANIFEST_DB = str(_project_root / os.getenv("MANIFEST_DB", "./manifest.db"))
 
+# --- SQLite Recommendation Cache (keyed by fingerprint signature_id) ---
+RECOMMENDATION_CACHE_DB = str(_project_root / os.getenv("RECOMMENDATION_CACHE_DB", "./recommendations.db"))
+
 # --- Wiki Source (local editing surface, synced to MinIO) ---
 WIKI_SOURCE_DIR = str(_project_root / os.getenv("WIKI_SOURCE_DIR", "./wiki"))
 
@@ -58,6 +61,13 @@ def init_llama_index_settings():
         base_url=OLLAMA_BASE_URL,
         request_timeout=120.0,
         temperature=0.1,
+        # ponytail: default context_window=-1 makes LlamaIndex request llama3.1's full
+        # 131072-token context from Ollama, which doesn't fit an 8B model's KV cache in
+        # 8GB VRAM and forces ~74% of inference onto CPU (10x+ slower). Our prompts
+        # (SRE_QA_PROMPT + top_k chunks) are a few thousand tokens at most — 8192 covers
+        # that with headroom while keeping the whole KV cache on GPU. Raise if chunk_size
+        # or top_k grow enough to truncate context.
+        context_window=8192,
     )
     Settings.embed_model = OllamaEmbedding(
         model_name=OLLAMA_EMBED_MODEL,

@@ -7,10 +7,10 @@ same rule that keeps retrieval scoring outside the model (config/scoring.yaml).
 Rules live in config/fingerprint.yaml so they can be tuned without code changes.
 
 Pipeline:
-    raw alert text -> normalize_message()   (strip volatile fields)
-                   -> extract_root_frame()  (first non-framework JEE frame, if a trace is given)
+    raw alert text -> normalize_message()    (strip volatile fields)
+                   -> extract_root_frames()  (top N non-framework JEE frames, if a trace is given)
                    -> classify_error_family() (regex bucket, keyed to an RB-xxx runbook slug)
-                   -> compute_fingerprint() -> Fingerprint (signature + signature_id)
+                   -> compute_fingerprint()  -> Fingerprint (signature + signature_id)
 
 A family of "unknown" means no rule matched — callers must surface that as
 "no strong match found", never guess a family to force a KB hit.
@@ -52,6 +52,7 @@ def load_fingerprint_config() -> dict:
 
 CONFIG = load_fingerprint_config()
 SIGNATURE_VERSION = CONFIG.get("version", "fp-v1")
+ROOT_FRAME_LIMIT = CONFIG.get("root_frame_limit", 3)
 _VOLATILE_PATTERNS = [
     (re.compile(p["pattern"], re.IGNORECASE), p["replacement"])
     for p in CONFIG.get("volatile_patterns", [])
@@ -89,20 +90,29 @@ def normalize_message(text: str) -> str:
     return normalized.strip()
 
 
-def extract_root_frame(stack_trace: str) -> Optional[str]:
-    """Return the first stack frame NOT belonging to a known framework/stdlib
-    package — the application code most likely responsible for the error.
-    Returns None if no application frame is found (or no trace given)."""
+def extract_root_frames(stack_trace: str, limit: int = ROOT_FRAME_LIMIT) -> list[str]:
+    """Return up to `limit` stack frames NOT belonging to a known framework/stdlib
+    package, in original (outermost-first) order — the application code most
+    likely responsible for the error. Returns [] if no application frame is found
+    (or no trace given).
+
+    Hashing multiple frames (not just the first) into the fingerprint anchor
+    avoids collisions where two unrelated bugs both pass through one shared
+    application-level utility method — matches Sentry's grouping approach.
+    """
     if not stack_trace:
-        return None
+        return []
+    frames = []
     for line in stack_trace.splitlines():
         match = _STACK_FRAME_RE.match(line)
         if not match:
             continue
         class_name = match.group(1)
         if not class_name.startswith(_FRAMEWORK_PREFIXES):
-            return line.strip()
-    return None
+            frames.append(line.strip())
+            if len(frames) >= limit:
+                break
+    return frames
 
 
 def classify_error_family(text: str) -> str:
@@ -124,16 +134,16 @@ def compute_fingerprint(
 ) -> Fingerprint:
     """Compose a deterministic signature from alert text + optional stack trace.
 
-    Anchor priority: root_frame (strongest signal for a JEE exception) if
-    present, else the normalized message. error_family and service narrow
-    the match before the anchor is applied, so unrelated errors with similar
-    wording on different services never collide.
+    Anchor priority: top in-app stack frames (strongest signal for a JEE
+    exception) if present, else the normalized message. error_family and
+    service narrow the match before the anchor is applied, so unrelated
+    errors with similar wording on different services never collide.
     """
     normalized = normalize_message(raw_text)
-    root_frame = extract_root_frame(stack_trace) if stack_trace else None
+    root_frames = extract_root_frames(stack_trace) if stack_trace else []
     family = classify_error_family(raw_text)
 
-    anchor = root_frame if root_frame else normalized
+    anchor = "\n".join(root_frames) if root_frames else normalized
     signature = f"{family}::{service.lower()}::{anchor}"
     signature_id = hashlib.sha256(signature.encode("utf-8")).hexdigest()[:12]
 
@@ -143,7 +153,7 @@ def compute_fingerprint(
         environment=environment.lower(),
         error_family=family,
         normalized_message=normalized,
-        root_frame=root_frame,
+        root_frame=root_frames[0] if root_frames else None,
         signature=signature,
         signature_id=signature_id,
     )

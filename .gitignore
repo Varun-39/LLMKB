@@ -8,6 +8,7 @@ __pycache__/
 # Data stores (local, regenerated from source)
 chroma_db/
 manifest.db
+recommendations.db
 
 # MinIO data (Docker volume)
 minio_data/

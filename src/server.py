@@ -1,10 +1,9 @@
 """
-FastAPI persistent service — loads LlamaIndex, ChromaDB, BM25, and Ollama once at startup.
-Queries hit a warm index. No cold-start penalty per request.
+FastAPI persistent service — loads LlamaIndex, ChromaDB, and Ollama once at startup.
+Alerts hit a warm index. No cold-start penalty per request.
 
 Endpoints:
-    POST /query          — retrieve + optional generation (JSON response)
-    POST /query/stream   — streaming generation (Server-Sent Events)
+    POST /alert          — fingerprint an alert, return a grounded recommendation
     GET  /health         — ChromaDB + Ollama status
     POST /ingest/refresh — re-index changed docs
 
@@ -18,8 +17,9 @@ from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from src.alerts import SplunkAlert
 
 # ponytail: heavy imports (LlamaIndex, ChromaDB) deferred to lifespan/endpoints
 # to avoid blocking module import. Only stdlib + fastapi + pydantic at top level.
@@ -32,12 +32,11 @@ _state = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load LlamaIndex settings, ChromaDB index, BM25 index, and service graph once at startup."""
+    """Load LlamaIndex settings, ChromaDB index, and BM25 index once at startup."""
     import asyncio
     from src.config import init_llama_index_settings
     from src.indexer import load_index
     from src.retrieval import get_bm25
-    from src.graph import get_service_graph
 
     loop = asyncio.get_event_loop()
     # ponytail: run all blocking I/O (ChromaDB + BM25 corpus load) off the event loop
@@ -45,8 +44,7 @@ async def lifespan(app: FastAPI):
     await loop.run_in_executor(None, init_llama_index_settings)
     _state["index"] = await loop.run_in_executor(None, load_index)
     await loop.run_in_executor(None, get_bm25)
-    await loop.run_in_executor(None, get_service_graph)
-    logger.info("Startup complete: index + BM25 + service graph loaded")
+    logger.info("Startup complete: index + BM25 loaded")
     yield
     _state.clear()
 
@@ -56,15 +54,6 @@ app = FastAPI(title="LLMKB2 — AIOps Runbook Assistant", lifespan=lifespan)
 
 # --- Models ---
 
-class QueryRequest(BaseModel):
-    question: str
-    doc_type: Optional[str] = None
-    service: Optional[str] = None
-    severity: Optional[str] = None
-    top_k: int = 8
-    no_generate: bool = False
-
-
 class Citation(BaseModel):
     doc_id: str
     doc_type: str
@@ -72,12 +61,6 @@ class Citation(BaseModel):
     service: str
     score: float
     score_explain: Optional[dict[str, Any]] = None
-
-
-class QueryResponse(BaseModel):
-    answer: str
-    citations: list[Citation]
-    latency_ms: int
 
 
 def _citations(nodes) -> list[Citation]:
@@ -96,58 +79,93 @@ def _citations(nodes) -> list[Citation]:
 
 # --- Endpoints ---
 
-@app.post("/query", response_model=QueryResponse)
-async def query_endpoint(req: QueryRequest):
-    """Retrieve (with ID routing + hybrid) and optionally generate an answer."""
+class FingerprintInfo(BaseModel):
+    signature_id: str
+    error_family: str
+    root_frame: Optional[str] = None
+
+
+class AlertResponse(BaseModel):
+    fingerprint: FingerprintInfo
+    query: str
+    answer: str
+    citations: list[Citation]
+    latency_ms: int
+    cached: bool = False
+    hit_count: int = 0
+
+
+@app.post("/alert", response_model=AlertResponse)
+async def alert_endpoint(alert: SplunkAlert):
+    """
+    Demo alert intake — accepts a synthetic Splunk-webhook-shaped alert
+    (see src/alerts.py and data/sample_alerts/*.json), fingerprints it,
+    and returns a grounded recommendation. Stands in for the real
+    Splunk/ITRS event intake API until that integration is approved.
+
+    An identical recurring incident (same fingerprint signature_id) is served
+    from src/recommendation_cache.py instead of re-running retrieval + LLM
+    generation — see that module's docstring.
+    """
+    from src.alerts import alert_to_query
+    from src.fingerprint import compute_fingerprint
+    from src.query import build_query_engine
+    from src import recommendation_cache
+
     start = time.perf_counter()
 
-    from src.query import retrieve_only, build_query_engine
-    from src.retrieval import is_id_lookup
+    fp = compute_fingerprint(
+        raw_text=alert.result.message,
+        service=alert.result.service,
+        environment=alert.result.environment,
+        stack_trace=alert.result.stack_trace,
+    )
+    fp_info = FingerprintInfo(
+        signature_id=fp.signature_id,
+        error_family=fp.error_family,
+        root_frame=fp.root_frame,
+    )
 
-    if req.no_generate:
-        nodes = retrieve_only(
-            req.question, top_k=req.top_k,
-            doc_type=req.doc_type, service=req.service, severity=req.severity,
+    cached = recommendation_cache.get_cached(fp.signature_id)
+    if cached is not None:
+        elapsed = int((time.perf_counter() - start) * 1000)
+        logger.info(f"[alert] {alert.search_name} | family={fp.error_family} | CACHE HIT #{cached.hit_count} | {elapsed}ms")
+        return AlertResponse(
+            fingerprint=fp_info,
+            query=cached.query,
+            answer=cached.answer,
+            citations=[Citation(**c) for c in cached.citations],
+            latency_ms=elapsed,
+            cached=True,
+            hit_count=cached.hit_count,
         )
-        answer = "(retrieval only)"
-        mode = "retrieve"
-    else:
-        engine = build_query_engine(
-            top_k=req.top_k, query=req.question, doc_type=req.doc_type,
-            service=req.service, severity=req.severity,
-        )
-        response = engine.query(req.question)
-        answer = str(response)
-        nodes = response.source_nodes
-        mode = "id" if is_id_lookup(req.question) else "rag"
+
+    query_text = alert_to_query(alert, fingerprint=fp)
+
+    engine = build_query_engine(top_k=8, service=alert.result.service)
+    response = engine.query(query_text)
+    answer = str(response)
+    citations = _citations(response.source_nodes)
+
+    recommendation_cache.store(
+        signature_id=fp.signature_id,
+        error_family=fp.error_family,
+        service=alert.result.service,
+        query=query_text,
+        answer=answer,
+        citations=[c.model_dump() for c in citations],
+    )
 
     elapsed = int((time.perf_counter() - start) * 1000)
-    logger.info(f"[{mode}] \"{req.question[:60]}\" | {elapsed}ms | {len(nodes)} results")
+    logger.info(f"[alert] {alert.search_name} | family={fp.error_family} | {elapsed}ms")
 
-    return QueryResponse(answer=answer, citations=_citations(nodes), latency_ms=elapsed)
-
-
-@app.post("/query/stream")
-async def query_stream(req: QueryRequest):
-    """Stream the answer token-by-token via Server-Sent Events (first token in ~2s)."""
-    from src.query import build_query_engine
-
-    def generate():
-        start = time.perf_counter()
-        engine = build_query_engine(
-            top_k=req.top_k, query=req.question, doc_type=req.doc_type,
-            service=req.service, severity=req.severity, streaming=True,
-        )
-        response = engine.query(req.question)
-        for token in response.response_gen:
-            yield token
-        elapsed = int((time.perf_counter() - start) * 1000)
-        # Trailing citation summary
-        ids = ", ".join(n.node.metadata.get("id", "?") for n in response.source_nodes[:5])
-        yield f"\n\n---\nSources: {ids}\nLatency: {elapsed}ms\n"
-        logger.info(f"[stream] \"{req.question[:60]}\" | {elapsed}ms")
-
-    return StreamingResponse(generate(), media_type="text/plain")
+    return AlertResponse(
+        fingerprint=fp_info,
+        query=query_text,
+        answer=answer,
+        citations=citations,
+        latency_ms=elapsed,
+    )
 
 
 @app.get("/health")
@@ -175,82 +193,15 @@ async def health():
 
 @app.post("/ingest/refresh")
 async def refresh():
-    """Re-ingest changed documents, reload the index, BM25, and service graph."""
+    """Re-ingest changed documents, reload the index and BM25."""
     from src.ingest import run_ingestion
     from src.indexer import load_index
     from src.retrieval import reset_bm25, get_bm25
-    from src.graph import reset_graph, get_service_graph
+    from src.recommendation_cache import reset_cache
 
     stats = run_ingestion(force=False, local=False)
     _state["index"] = load_index()
     reset_bm25()
     get_bm25()  # rebuild
-    reset_graph()
-    get_service_graph()  # rebuild
+    reset_cache()  # cached answers may no longer be grounded in the updated KB
     return {"status": "refreshed", "stats": stats}
-
-
-# --- Graph endpoints ---
-
-@app.get("/graph/stats")
-async def graph_stats():
-    """Return service dependency graph summary statistics."""
-    from src.graph import get_service_graph
-    graph = get_service_graph()
-    return graph.get_stats()
-
-
-@app.get("/graph/blast-radius/{service}")
-async def blast_radius(service: str, depth: int = 2):
-    """
-    Return services affected if the given service goes down.
-    depth: BFS traversal depth (default 2).
-    """
-    from src.graph import get_service_graph
-    graph = get_service_graph()
-    affected = graph.affected_by(service, depth=depth)
-    return {
-        "service": service,
-        "depth": depth,
-        "affected": affected,
-        "affected_count": len(affected),
-    }
-
-
-@app.get("/graph/service/{service}")
-async def service_info(service: str):
-    """Return incidents and runbooks associated with a service."""
-    from src.graph import get_service_graph
-    graph = get_service_graph()
-    return {
-        "service": service,
-        "incidents": graph.incidents_for(service),
-        "runbooks": graph.runbooks_for(service),
-    }
-
-
-# --- Sub-question endpoint (for complex multi-part queries) ---
-
-class SubQueryRequest(BaseModel):
-    question: str
-    top_k: int = 8
-
-
-@app.post("/query/sub")
-async def sub_question_query(req: SubQueryRequest):
-    """
-    Decompose a complex query into sub-questions, retrieve independently, then synthesize.
-    Best for comparison/analysis queries like 'Compare INC-005 root cause with INC-008'.
-    """
-    from src.query import build_sub_question_engine
-    import time as _time
-
-    start = _time.perf_counter()
-    engine = build_sub_question_engine(top_k=req.top_k)
-    response = engine.query(req.question)
-    elapsed = int((_time.perf_counter() - start) * 1000)
-
-    return {
-        "answer": str(response),
-        "latency_ms": elapsed,
-    }
