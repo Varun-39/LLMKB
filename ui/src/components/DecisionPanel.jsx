@@ -21,6 +21,11 @@ function timeAgo() {
   return 'just now'
 }
 
+// Accept/Edit require something to accept or edit — hidden when there's no
+// recommended_action (band="none"). Escalate/KB Gap/Reject remain: KB Gap in
+// particular is the meaningful call when "no match" is itself the finding.
+const NEEDS_ACTION = new Set(['accept', 'edit'])
+
 export default function DecisionPanel({ card }) {
   const [actor, setActor] = useState('')
   const [selected, setSelected] = useState(null)
@@ -56,6 +61,10 @@ export default function DecisionPanel({ card }) {
     )
   }
 
+  const availableDecisions = card.recommended_action === null
+    ? DECISIONS.filter((d) => !NEEDS_ACTION.has(d.id))
+    : DECISIONS
+
   const needsComment = selected && COMMENT_REQUIRED.has(selected)
   const needsEdit = selected === 'edit'
 
@@ -66,8 +75,7 @@ export default function DecisionPanel({ card }) {
       const result = await submitFeedback(card.correlation_id, {
         signature_id: card.signature_id,
         error_family: card.error_family,
-        // recommended_runbook is Optional on the backend and not present on
-        // RecommendationCard — omitted rather than guessed from evidence order.
+        recommended_runbook: card.recommended_runbook,
         decision: selected,
         actor,
         comment: comment || undefined,
@@ -96,7 +104,7 @@ export default function DecisionPanel({ card }) {
       />
 
       <div className="flex flex-wrap gap-2">
-        {DECISIONS.map((d) => (
+        {availableDecisions.map((d) => (
           <button
             key={d.id}
             type="button"
@@ -155,7 +163,7 @@ export default function DecisionPanel({ card }) {
             disabled={submitting}
             className="rounded-lg bg-coral px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-coral-deep disabled:opacity-50"
           >
-            {submitting ? 'Submitting…' : `Submit ${DECISIONS.find((d) => d.id === selected).label}`}
+            {submitting ? 'Submitting…' : `Submit ${availableDecisions.find((d) => d.id === selected).label}`}
           </button>
           {error && <span className="text-sm font-medium text-danger">{error}</span>}
         </div>

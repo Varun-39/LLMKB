@@ -6,6 +6,7 @@ Endpoints:
     POST /alert                        — fingerprint an alert, return a grounded recommendation
     POST /cards/{correlation_id}/feedback — record an ops decision on a card
     GET  /health                       — ChromaDB + Ollama status
+    GET  /metrics                      — feedback.db rollup (acceptance/false-match/kb-gap rates)
     POST /ingest/refresh                — re-index changed docs
 
 Run:
@@ -52,7 +53,7 @@ async def lifespan(app: FastAPI):
     _state.clear()
 
 
-app = FastAPI(title="LLMKB2 — AIOps Runbook Assistant", lifespan=lifespan)
+app = FastAPI(title="AI Runbook Assistant", lifespan=lifespan)
 
 
 # --- Endpoints ---
@@ -205,6 +206,20 @@ async def health():
         "ollama": "connected" if ollama_ok else "unreachable",
         "model": OLLAMA_MODEL,
     }
+
+
+@app.get("/metrics")
+async def metrics():
+    """
+    Rollup of feedback.db (deck slide 10's "Observability" guardrail:
+    acceptance rate, false matches, KB gaps). time_saved and precision are
+    reported as explicit unmeasured notes, not fabricated numbers — see
+    src/metrics.py's docstring for why.
+    """
+    from dataclasses import asdict
+    from src.metrics import compute_rollup
+
+    return asdict(compute_rollup())
 
 
 @app.post("/ingest/refresh")

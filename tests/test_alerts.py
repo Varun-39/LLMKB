@@ -48,7 +48,16 @@ def check_fixture(path: Path) -> None:
     if fp.root_frame:
         assert fp.root_frame in enriched, f"{path.name}: root_frame missing from enriched query"
 
-    print(f"OK  {path.name:40s} family={fp.error_family:28s} sig={fp.signature_id}  root_frame={'yes' if fp.root_frame else 'no'}")
+    # ITRS is optional — when present and noteworthy, its clause must reach the
+    # query text (this is what lets retrieval/BM25 see it at all).
+    itrs_note = "no"
+    if alert.itrs is not None:
+        clause = alert.itrs.summary()
+        if clause:
+            assert clause in enriched, f"{path.name}: itrs summary missing from enriched query"
+            itrs_note = "yes"
+
+    print(f"OK  {path.name:40s} family={fp.error_family:28s} sig={fp.signature_id}  root_frame={'yes' if fp.root_frame else 'no'}  itrs={itrs_note}")
 
 
 def main():

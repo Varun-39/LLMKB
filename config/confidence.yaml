@@ -49,7 +49,15 @@ require_same_runbook: true
 # Card copy when band == 'none' (empty/insufficient evidence — R2).
 no_match_message: "No strong knowledge match found."
 
-# If true, 'low' band is treated the same as 'none' for card purposes (null
-# action) rather than a caveated recommendation. Team preference, not a
-# correctness requirement — 'low' is still a real signal, just weak.
-treat_low_as_no_action: false
+# Reconciled against the pitch deck's 3-state confidence story (slide 10:
+# "High = recommend; medium = caveated recommendation; low = no strong
+# knowledge match found") — the deck has no separate 'low' tier, it folds low
+# into "no match". Setting this true makes that literally true here too: a
+# 'low'-scoring cohort is converted to band 'none' before it ever reaches a
+# RecommendationCard (src/confidence.py's compute_confidence()), so
+# recommended_action comes back null exactly as it would for 'none'. The
+# score/ratio and cohort_size are still computed and returned on Confidence
+# for audit/tuning — this only changes which BAND a client sees, not whether
+# the underlying evidence was weighed. Flip back to false only if the product
+# story changes to show a caveated low-confidence action again.
+treat_low_as_no_action: true

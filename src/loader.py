@@ -129,9 +129,11 @@ class MinIOMarkdownReader(BaseReader):
         self,
         prefix: Optional[str] = None,
         exclude_templates: bool = True,
+        exclude_pending_review: bool = True,
     ):
         self.prefix = prefix
         self.exclude_templates = exclude_templates
+        self.exclude_pending_review = exclude_pending_review
 
     def load_data(self) -> list[LIDocument]:
         from minio import Minio
@@ -153,6 +155,12 @@ class MinIOMarkdownReader(BaseReader):
             if not key.endswith(".md"):
                 continue
             if self.exclude_templates and key.startswith("Templates/"):
+                continue
+            # Content landed here by scripts/import_atlassian_seed.py (the deck's
+            # "Jira one-time seed" step) is unreviewed and must never become
+            # searchable/"approved" just by being ingested — same exclusion
+            # mechanism as Templates/, see PENDING_REVIEW_DIR in that script.
+            if self.exclude_pending_review and key.startswith("Pending Review/"):
                 continue
             if ".obsidian" in key:
                 continue
@@ -189,9 +197,11 @@ class LocalMarkdownReader(BaseReader):
         self,
         wiki_dir: Optional[str] = None,
         exclude_templates: bool = True,
+        exclude_pending_review: bool = True,
     ):
         self.wiki_path = Path(wiki_dir or WIKI_SOURCE_DIR)
         self.exclude_templates = exclude_templates
+        self.exclude_pending_review = exclude_pending_review
 
     def load_data(self) -> list[LIDocument]:
         documents = []
@@ -201,6 +211,10 @@ class LocalMarkdownReader(BaseReader):
             object_key = relative_path.as_posix()
 
             if self.exclude_templates and object_key.startswith("Templates/"):
+                continue
+            # See MinIOMarkdownReader's matching check — unreviewed Jira/Confluence
+            # imports must never enter the index just by landing in wiki/.
+            if self.exclude_pending_review and object_key.startswith("Pending Review/"):
                 continue
             if ".obsidian" in object_key:
                 continue

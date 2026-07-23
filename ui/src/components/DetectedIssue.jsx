@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 export default function DetectedIssue({ detectedIssue }) {
   const [expanded, setExpanded] = useState(false)
-  const { error, component, host, environment, raw_message } = detectedIssue
+  const { error, component, host, environment, raw_message, itrs_context } = detectedIssue
 
   return (
     <section className="rounded-xl border border-hairline bg-surface p-6 shadow-sm">
@@ -11,6 +11,11 @@ export default function DetectedIssue({ detectedIssue }) {
       <p className="mt-1.5 text-sm text-muted">
         <span className="font-medium text-ink">{component}</span> on {host} · {environment}
       </p>
+      {itrs_context && (
+        <p className="mt-1.5 text-sm text-muted">
+          <span className="font-medium text-ink">ITRS:</span> {itrs_context}
+        </p>
+      )}
 
       <button
         type="button"

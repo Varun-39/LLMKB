@@ -120,7 +120,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 60)
-    print("  LLMKB2 — Wiki → MinIO Sync")
+    print("  AI Runbook Assistant — Wiki -> MinIO Sync")
     print("=" * 60)
 
     stats = sync_wiki_to_minio(dry_run=args.dry_run)

@@ -1,0 +1,28 @@
+[
+  {
+    "id": "884213",
+    "type": "page",
+    "title": "PaymentService — HikariCP Pool Sizing Notes",
+    "space": { "key": "OPS" },
+    "version": { "number": 3, "when": "2026-07-22T11:00:00.000Z" },
+    "body": {
+      "storage": {
+        "value": "<p>Default HikariCP pool size for payment-adjacent services should scale with expected job concurrency, not request concurrency. Nightly batch jobs (exports, reconciliation) can exhaust a request-sized pool even when live traffic is low.</p><p>Rule of thumb: <strong>pool size &gt;= max concurrent batch workers + 20% headroom</strong>. Always set a connectionTimeout so callers fail fast instead of queuing indefinitely.</p>",
+        "representation": "storage"
+      }
+    }
+  },
+  {
+    "id": "884390",
+    "type": "page",
+    "title": "On-call Escalation Contacts — Payments Pod",
+    "space": { "key": "OPS" },
+    "version": { "number": 7, "when": "2026-07-10T08:30:00.000Z" },
+    "body": {
+      "storage": {
+        "value": "<p>Primary: payments on-call rotation in PagerDuty.</p><p>Secondary escalation after 15 minutes with no acknowledgement: Platform EM.</p><p>Data integrity concerns: page #data-eng directly, do not wait for triage.</p>",
+        "representation": "storage"
+      }
+    }
+  }
+]

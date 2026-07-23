@@ -1,6 +1,13 @@
 """
 Central configuration loaded from environment variables.
 Uses Ollama for LLM/embeddings, MinIO for document storage, ChromaDB for vectors.
+
+ponytail: the model backend is hardcoded to local Ollama for this demo phase —
+this is a deliberate simplification, not a silent divergence from the pitch
+deck's "Model Options for Recommendation Generation" slide (which pitches
+Bedrock/Claude/Nova/Mistral/etc. as pluggable options once retrieval+scoring
+are proven). See README's "Model Story" section. No provider abstraction
+exists here; adding one is future work, not built speculatively now.
 """
 
 import os

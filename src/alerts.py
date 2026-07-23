@@ -1,12 +1,15 @@
 """
-Synthetic alert intake — demo stand-in for a real Splunk webhook alert action.
+Synthetic alert intake — demo stand-in for a real Splunk webhook alert action,
+with an optional ITRS health context alongside it.
 
 ponytail: this is a demo. There is no live Splunk/ITRS integration; alerts
 are POSTed as JSON shaped like Splunk's webhook alert action payload
-(sid/search_name/result), either hand-built or from data/sample_alerts/*.json.
+(sid/search_name/result) plus an optional `itrs` block (ITRSContext, below),
+either hand-built or from data/sample_alerts/*.json.
 Upgrade path: replace the /alert endpoint's request body with an actual
-Splunk webhook receiver once real alert access is approved (see the deck's
-"Event intake API" component) — SplunkAlert's shape already matches that
+Splunk webhook receiver, and add a real ITRS event/API pull merged into the
+same payload, once real alert access is approved (see the deck's "Event
+intake API" component) — SplunkAlert's shape already matches that combined
 payload, so the swap is endpoint-only, no schema change.
 
 Splunk webhook alert actions POST:
@@ -45,8 +48,53 @@ class SplunkResult(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class ITRSContext(BaseModel):
+    """
+    ITRS Geneos-style health snapshot for the host/dependency around the alert's
+    time window (process state, host health, dependency latency) — the deck's
+    "Context-aware: combine ... host, component, environment and ITRS health
+    state" design principle, and the "ITRS integration" event source in the
+    solution overview.
+
+    ponytail: schema-only for this demo phase, same simplification as
+    SplunkAlert itself — there is no live ITRS Geneos API/webhook client here.
+    See project memory: alert input stays synthetic JSON (hand-built or from
+    data/sample_alerts/*.json) until real Splunk/ITRS access is approved.
+    Upgrade path: an ITRS event intake feeds this same shape once available;
+    no schema change needed, only a new ingestion source.
+    """
+
+    process_status: str = "UP"           # UP | DEGRADED | DOWN
+    host_health: str = "OK"              # OK | WARNING | CRITICAL
+    dependency: Optional[str] = None     # e.g. "database", "message-queue"
+    dependency_status: str = "OK"        # OK | DEGRADED | CRITICAL
+    latency_ms: Optional[float] = None
+    notes: Optional[str] = None          # e.g. "DB listener instability observed"
+
+    def summary(self) -> Optional[str]:
+        """Short clause for the retrieval query text / card context, e.g.
+        'ITRS shows database degraded (latency 850ms): DB listener instability
+        observed.' Returns None when nothing noteworthy is reported (both
+        process and dependency healthy), so a fully-healthy ITRS block never
+        pads the query with boilerplate."""
+        bits = []
+        if self.process_status != "UP" or self.host_health != "OK":
+            bits.append(f"process {self.process_status.lower()}, host {self.host_health.lower()}")
+        if self.dependency and self.dependency_status != "OK":
+            lat = f" (latency {self.latency_ms:.0f}ms)" if self.latency_ms is not None else ""
+            bits.append(f"{self.dependency} {self.dependency_status.lower()}{lat}")
+        if not bits:
+            return None
+        clause = "ITRS shows " + "; ".join(bits) + "."
+        if self.notes:
+            clause += f" {self.notes}"
+        return clause
+
+
 class SplunkAlert(BaseModel):
-    """Top-level Splunk webhook alert action payload."""
+    """Top-level Splunk webhook alert action payload, plus an optional ITRS
+    health context merged in at the same "event intake" point the deck
+    describes (Splunk shows the symptom, ITRS shows surrounding health)."""
 
     sid: str
     search_name: str
@@ -54,6 +102,7 @@ class SplunkAlert(BaseModel):
     owner: str = "svc-monitoring"
     results_link: Optional[str] = None
     result: SplunkResult
+    itrs: Optional[ITRSContext] = None
 
 
 def alert_to_query(alert: SplunkAlert, fingerprint: "Optional[Fingerprint]" = None) -> str:
@@ -82,6 +131,10 @@ def alert_to_query(alert: SplunkAlert, fingerprint: "Optional[Fingerprint]" = No
         if fingerprint.root_frame:
             extra.append(fingerprint.root_frame)
         query += " (" + " | ".join(extra) + ")"
+    if alert.itrs is not None:
+        itrs_clause = alert.itrs.summary()
+        if itrs_clause:
+            query += f" {itrs_clause}"
     return query
 
 
@@ -109,6 +162,7 @@ class AlertContext:
     signature_id: str
     error_family: str
     root_frame: Optional[str] = None
+    itrs_summary: Optional[str] = None  # ITRSContext.summary(), None if no itrs block or nothing noteworthy
 
 
 def build_alert_context(alert: SplunkAlert, fingerprint: "Fingerprint") -> AlertContext:
@@ -123,4 +177,5 @@ def build_alert_context(alert: SplunkAlert, fingerprint: "Fingerprint") -> Alert
         signature_id=fingerprint.signature_id,
         error_family=fingerprint.error_family,
         root_frame=fingerprint.root_frame,
+        itrs_summary=alert.itrs.summary() if alert.itrs is not None else None,
     )

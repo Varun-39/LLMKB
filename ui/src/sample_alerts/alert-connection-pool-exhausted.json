@@ -15,5 +15,13 @@
     "severity": "ERROR",
     "message": "HikariPool-1 - Connection is not available, request timed out after 30000ms",
     "stack_trace": "com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Connection is not available\n\tat com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)\n\tat com.acme.reporting.export.ExportJobExecutor.runExport(ExportJobExecutor.java:88)\n\tat com.acme.reporting.export.ExportJobExecutor.lambda$submit$0(ExportJobExecutor.java:41)"
+  },
+  "itrs": {
+    "process_status": "UP",
+    "host_health": "WARNING",
+    "dependency": "database",
+    "dependency_status": "DEGRADED",
+    "latency_ms": 850,
+    "notes": "DB listener instability observed on app-04's connection pool."
   }
 }

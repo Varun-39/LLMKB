@@ -156,6 +156,7 @@ def build_recommendation_card(
         host=alert.result.host,
         environment=alert.result.environment,
         raw_message=alert.result.message,
+        itrs_context=alert_context.itrs_summary,
     )
 
     recommended_runbook = _find_recommended_runbook(nodes)
@@ -170,6 +171,7 @@ def build_recommendation_card(
             model_version=None,
             detected_issue=detected_issue,
             recommended_action=None,
+            recommended_runbook=recommended_runbook,
             evidence=evidence,
             confidence=confidence,
             risk=Risk(level=UNKNOWN_RISK_LABEL),
@@ -207,6 +209,7 @@ def build_recommendation_card(
                               # model touched the card unless one genuinely did)
         detected_issue=detected_issue,
         recommended_action=recommended_action,
+        recommended_runbook=recommended_runbook,
         evidence=evidence,
         confidence=confidence,
         risk=Risk(level=risk_level or UNKNOWN_RISK_LABEL),

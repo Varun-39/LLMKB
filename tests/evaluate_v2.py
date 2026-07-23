@@ -313,7 +313,7 @@ def display_retrieval_report(report: dict, verbose: bool = False) -> None:
     console.print(Panel(
         f"[bold]Retrieval Evaluation[/]\n"
         f"Queries: {report['total_queries']} | top_k: {report['top_k']} | eval@{report['eval_at']}",
-        title="[bold cyan]LLMKB2 Evaluation Report[/]",
+        title="[bold cyan]AI Runbook Assistant — Evaluation Report[/]",
         border_style="cyan",
     ))
 
@@ -405,7 +405,7 @@ def save_results(report: dict, filename: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="LLMKB2 — Comprehensive Retrieval & Generation Evaluation (v2)"
+        description="AI Runbook Assistant — Comprehensive Retrieval & Generation Evaluation (v2)"
     )
     parser.add_argument("--top-k", type=int, default=8, help="Retrieval depth")
     parser.add_argument("--eval-at", type=int, default=3, help="Evaluate metrics @k (default: 3)")

@@ -203,7 +203,7 @@ def print_summary(stats: dict) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="LLMKB2 Ingestion Pipeline (LlamaIndex)")
+    parser = argparse.ArgumentParser(description="AI Runbook Assistant — Ingestion Pipeline (LlamaIndex)")
     parser.add_argument("--force", action="store_true",
                         help="Force full re-index (ignore manifest)")
     parser.add_argument("--local", action="store_true",
@@ -216,7 +216,7 @@ def main():
     init_llama_index_settings()
 
     console.print("=" * 60)
-    console.print("  [bold]LLMKB2 — Ingestion Pipeline (LlamaIndex)[/]")
+    console.print("  [bold]AI Runbook Assistant — Ingestion Pipeline (LlamaIndex)[/]")
     console.print("=" * 60)
 
     import time

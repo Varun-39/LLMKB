@@ -23,6 +23,7 @@ class DetectedIssue(BaseModel):
     host: str
     environment: str
     raw_message: str
+    itrs_context: Optional[str] = None  # AlertContext.itrs_summary, e.g. "ITRS shows database degraded..."
 
 
 class Evidence(BaseModel):
@@ -75,6 +76,10 @@ class RecommendationCard(BaseModel):
     model_version: Optional[str] = None  # null when generation disabled (E3) — card is self-describing
     detected_issue: DetectedIssue
     recommended_action: Optional[str] = None
+    recommended_runbook: Optional[str] = None  # doc_id the recommendation is based on —
+                                                 # the feedback endpoint's recommended_runbook
+                                                 # field exists to record this per decision;
+                                                 # it must come from here, not be guessed by a client
     evidence: list[Evidence] = Field(default_factory=list)
     confidence: Confidence
     risk: Risk

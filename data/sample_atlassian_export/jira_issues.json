@@ -1,0 +1,53 @@
+[
+  {
+    "key": "OPS-4821",
+    "fields": {
+      "summary": "PaymentService pods OOMKilled after v2.14.0 rollout",
+      "issuetype": { "name": "Incident" },
+      "priority": { "name": "Highest" },
+      "status": { "name": "Done" },
+      "resolution": { "name": "Fixed" },
+      "components": [{ "name": "payment-gateway" }],
+      "created": "2026-06-02T03:20:00.000+0000",
+      "resolutiondate": "2026-06-02T04:05:00.000+0000",
+      "description": "<p>All payment-gateway pods OOMKilled in prod. Root cause: unbounded idempotency cache introduced in v2.14.0.</p>",
+      "comment": {
+        "comments": [
+          {
+            "author": { "displayName": "Priya Sharma" },
+            "created": "2026-06-02T03:50:00.000+0000",
+            "body": "Cherry-picked cache eviction patch (PR #1847), bumped memory limit to 2Gi as a stopgap, rolled out v2.14.1-hotfix."
+          },
+          {
+            "author": { "displayName": "Priya Sharma" },
+            "created": "2026-06-02T04:05:00.000+0000",
+            "body": "Confirmed all pods healthy, 0 restarts. Closing."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "OPS-4903",
+    "fields": {
+      "summary": "ReportingDB connection pool exhausted during nightly export job",
+      "issuetype": { "name": "Bug" },
+      "priority": { "name": "High" },
+      "status": { "name": "Done" },
+      "resolution": { "name": "Fixed" },
+      "components": [{ "name": "reporting-service" }],
+      "created": "2026-07-21T09:12:00.000+0000",
+      "resolutiondate": "2026-07-21T09:40:00.000+0000",
+      "description": "<p>HikariPool-1 timed out acquiring a connection during ExportJobExecutor.runExport. Pool size was too small for the nightly export job's concurrency.</p>",
+      "comment": {
+        "comments": [
+          {
+            "author": { "displayName": "on-call" },
+            "created": "2026-07-21T09:35:00.000+0000",
+            "body": "Increased HikariCP maximumPoolSize from 10 to 25 and added a queue timeout. Export job re-run succeeded."
+          }
+        ]
+      }
+    }
+  }
+]

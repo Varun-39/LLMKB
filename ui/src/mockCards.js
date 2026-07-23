@@ -46,6 +46,7 @@ export const MOCK_MEDIUM = {
   ...base,
   correlation_id: 'mock-medium-' + base.correlation_id,
   recommended_action: base.evidence[0].snippet,
+  recommended_runbook: 'RB-013',
   confidence: {
     band: 'medium',
     score: 0.58,
@@ -60,6 +61,7 @@ export const MOCK_LOW = {
   ...base,
   correlation_id: 'mock-low-' + base.correlation_id,
   recommended_action: base.evidence[0].snippet,
+  recommended_runbook: 'RB-013',
   confidence: {
     band: 'low',
     score: 0.31,
