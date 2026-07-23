@@ -15,6 +15,9 @@ tags:
   - exhaustion
   - networking
   - critical
+error_family: unknown
+resolution_runbook: RB-020
+resolution_outcome: resolved
 ---
 
 ## Summary

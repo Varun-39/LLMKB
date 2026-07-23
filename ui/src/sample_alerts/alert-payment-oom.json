@@ -1,0 +1,19 @@
+{
+  "sid": "scheduler__svc-monitoring__search__RMD7b1f4c88a2e91d03_at_1780013400_1",
+  "search_name": "PaymentGateway-PodCrashLooping",
+  "app": "search",
+  "owner": "svc-monitoring",
+  "results_link": "https://splunk.internal/app/search/@go?sid=RMD7b1f4c88a2e91d03",
+  "result": {
+    "_time": "2026-07-21T03:15:41Z",
+    "host": "app-02",
+    "source": "/var/log/payment-gateway/app.log",
+    "sourcetype": "jee:app:log",
+    "component": "PaymentGateway",
+    "service": "payment-gateway",
+    "environment": "prod",
+    "severity": "CRITICAL",
+    "message": "OOMKilled: container payment-gateway exceeded memory limit, pod evicted",
+    "stack_trace": "java.lang.OutOfMemoryError: Java heap space\n\tat com.acme.payments.idempotency.IdempotencyCache.put(IdempotencyCache.java:64)\n\tat com.acme.payments.gateway.PaymentController.process(PaymentController.java:112)"
+  }
+}

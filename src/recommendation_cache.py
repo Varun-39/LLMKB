@@ -2,15 +2,18 @@
 SQLite recommendation cache — keyed by alert fingerprint signature_id.
 
 An identical recurring incident (same error_family + service + stack anchor)
-shouldn't re-pay full retrieval + LLM generation every time. On a signature
-match, /alert returns the last accepted recommendation instantly instead of
-re-running the ~10s pipeline; hit_count also gives the "N of M prior
-incidents resolved this way" confidence stat the recommendation card wants.
+shouldn't re-pay full retrieval + scoring + LLM phrasing every time. On a
+signature match, /alert returns the last card instantly instead of re-running
+the pipeline; hit_count also gives the "N of M prior incidents resolved this
+way" stat visibility, alongside confidence's own cohort counts.
+
+Stores the full RecommendationCard as JSON (card is the complete answer —
+action, evidence, confidence, risk — there's no narrower "answer" string
+separate from it anymore).
 
 Same pattern as src/manifest.py (SQLite, create-if-missing, per-call connections).
 """
 
-import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -28,9 +31,7 @@ def get_connection() -> sqlite3.Connection:
             signature_id TEXT PRIMARY KEY,
             error_family TEXT NOT NULL,
             service TEXT NOT NULL,
-            query TEXT NOT NULL,
-            answer TEXT NOT NULL,
-            citations_json TEXT NOT NULL,
+            card_json TEXT NOT NULL,
             hit_count INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             last_used_at TEXT NOT NULL
@@ -45,9 +46,7 @@ class CachedRecommendation:
     signature_id: str
     error_family: str
     service: str
-    query: str
-    answer: str
-    citations: list
+    card_json: str
     hit_count: int
 
 
@@ -73,28 +72,25 @@ def get_cached(signature_id: str) -> Optional[CachedRecommendation]:
         signature_id=row["signature_id"],
         error_family=row["error_family"],
         service=row["service"],
-        query=row["query"],
-        answer=row["answer"],
-        citations=json.loads(row["citations_json"]),
+        card_json=row["card_json"],
         hit_count=row["hit_count"] + 1,
     )
 
 
-def store(signature_id: str, error_family: str, service: str, query: str, answer: str, citations: list) -> None:
-    """Cache a freshly generated recommendation under its fingerprint signature."""
+def store(signature_id: str, error_family: str, service: str, card_json: str) -> None:
+    """Cache a freshly assembled card under its fingerprint signature."""
     now = datetime.now(timezone.utc).isoformat()
     conn = get_connection()
     conn.execute(
         """
         INSERT INTO recommendations
-            (signature_id, error_family, service, query, answer, citations_json, hit_count, created_at, last_used_at)
-        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
+            (signature_id, error_family, service, card_json, hit_count, created_at, last_used_at)
+        VALUES (?, ?, ?, ?, 0, ?, ?)
         ON CONFLICT(signature_id) DO UPDATE SET
-            answer = excluded.answer,
-            citations_json = excluded.citations_json,
+            card_json = excluded.card_json,
             last_used_at = excluded.last_used_at
         """,
-        (signature_id, error_family, service, query, answer, json.dumps(citations), now, now),
+        (signature_id, error_family, service, card_json, now, now),
     )
     conn.commit()
     conn.close()

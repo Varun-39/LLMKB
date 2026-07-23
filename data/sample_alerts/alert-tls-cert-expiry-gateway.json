@@ -1,0 +1,19 @@
+{
+  "sid": "scheduler__svc-monitoring__search__RMD3f5a8c2b7e1d09_at_1780102900_1",
+  "search_name": "API-Gateway-5xx-Critical",
+  "app": "search",
+  "owner": "svc-monitoring",
+  "results_link": "https://splunk.internal/app/search/@go?sid=RMD3f5a8c2b7e1d09",
+  "result": {
+    "_time": "2026-07-22T00:02:44Z",
+    "host": "api-gw-01",
+    "source": "/var/log/api-gateway/tls.log",
+    "sourcetype": "jee:app:log",
+    "component": "APIGateway",
+    "service": "api-gateway",
+    "environment": "prod",
+    "severity": "ERROR",
+    "message": "ssl_error:certificate has expired, serial: 3A:F2:...",
+    "stack_trace": null
+  }
+}

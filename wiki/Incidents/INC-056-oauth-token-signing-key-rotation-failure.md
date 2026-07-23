@@ -15,6 +15,9 @@ tags:
   - auth
   - critical
   - prod
+error_family: connection-pool-exhausted
+resolution_runbook: RB-012
+resolution_outcome: resolved
 ---
 
 ## Summary

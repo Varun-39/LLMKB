@@ -16,6 +16,9 @@ tags:
   - s3
   - moderate
   - prod
+error_family: unknown
+resolution_runbook: RB-015
+resolution_outcome: resolved
 ---
 
 ## Summary

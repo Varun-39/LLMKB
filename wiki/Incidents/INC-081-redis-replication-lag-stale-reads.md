@@ -15,6 +15,9 @@ tags:
   - auth
   - sessions
   - prod
+error_family: db-read-replica-lag
+resolution_runbook: RB-013
+resolution_outcome: resolved
 ---
 
 ## Summary

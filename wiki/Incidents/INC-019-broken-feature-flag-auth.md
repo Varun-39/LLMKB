@@ -16,6 +16,9 @@ tags:
   - critical
   - prod
   - auth
+error_family: broken-feature-flag
+resolution_runbook: RB-006
+resolution_outcome: resolved
 ---
 
 ## Summary

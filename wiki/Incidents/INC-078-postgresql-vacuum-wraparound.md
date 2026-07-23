@@ -14,6 +14,9 @@ tags:
   - database
   - transaction-wraparound
   - critical
+error_family: unknown
+resolution_runbook: RB-030
+resolution_outcome: resolved
 ---
 
 ## Summary

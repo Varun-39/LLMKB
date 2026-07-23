@@ -1,0 +1,19 @@
+{
+  "sid": "scheduler__svc-monitoring__search__RMD19d63a7f4e0c8b52_at_1780016100_1",
+  "search_name": "AuthDB-DiskFull",
+  "app": "search",
+  "owner": "svc-monitoring",
+  "results_link": "https://splunk.internal/app/search/@go?sid=RMD19d63a7f4e0c8b52",
+  "result": {
+    "_time": "2026-07-21T11:02:55Z",
+    "host": "db-01",
+    "source": "/var/log/postgresql/postgresql.log",
+    "sourcetype": "postgres:log",
+    "component": "AuthDB",
+    "service": "auth-service",
+    "environment": "prod",
+    "severity": "ERROR",
+    "message": "PANIC: could not write to file \"pg_wal/000000010000000000000042\": No space left on device",
+    "stack_trace": null
+  }
+}

@@ -1,0 +1,17 @@
+# Ops decision capture (G1-G4). Edit this file to change which decisions are
+# valid or when a comment/edited action is required — no code changes needed.
+
+valid_decisions:
+  - accept
+  - edit
+  - reject
+  - escalate
+  - kb_gap
+
+require_comment_for:
+  - reject
+  - escalate
+  - kb_gap
+
+edited_action_required_for:
+  - edit

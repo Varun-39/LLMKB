@@ -15,6 +15,9 @@ tags:
   - permission-boundary
   - payment-service
   - prod
+error_family: unknown
+resolution_runbook: RB-023
+resolution_outcome: resolved
 ---
 
 ## Summary

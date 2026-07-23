@@ -14,6 +14,9 @@ tags:
   - provider-upgrade
   - infrastructure
   - prod
+error_family: unknown
+resolution_runbook: RB-016
+resolution_outcome: resolved
 ---
 
 ## Summary

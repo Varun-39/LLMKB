@@ -15,6 +15,9 @@ tags:
   - network-partition
   - database
   - critical
+error_family: unknown
+resolution_runbook: RB-019
+resolution_outcome: resolved
 ---
 
 ## Summary

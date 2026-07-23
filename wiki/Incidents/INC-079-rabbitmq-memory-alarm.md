@@ -14,6 +14,9 @@ tags:
   - memory
   - publisher-block
   - queue
+error_family: unknown
+resolution_runbook: RB-013
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -1,0 +1,19 @@
+{
+  "sid": "scheduler__svc-monitoring__search__RMD7a2c9b1e4d0f88_at_1780098700_1",
+  "search_name": "APIGateway-PodOOMKilled",
+  "app": "search",
+  "owner": "svc-monitoring",
+  "results_link": "https://splunk.internal/app/search/@go?sid=RMD7a2c9b1e4d0f88",
+  "result": {
+    "_time": "2026-07-22T14:23:11Z",
+    "host": "api-gw-03",
+    "source": "/var/log/api-gateway/app.log",
+    "sourcetype": "jee:app:log",
+    "component": "APIGateway",
+    "service": "api-gateway",
+    "environment": "prod",
+    "severity": "ERROR",
+    "message": "java.lang.OutOfMemoryError: GC overhead limit exceeded",
+    "stack_trace": null
+  }
+}

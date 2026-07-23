@@ -13,6 +13,9 @@ tags:
   - certificates
   - service-mesh
   - security
+error_family: tls-cert-expiry
+resolution_runbook: RB-011
+resolution_outcome: resolved
 ---
 
 ## Summary

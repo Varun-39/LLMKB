@@ -17,6 +17,9 @@ tags:
   - high
   - prod
   - api
+error_family: memory-pressure
+resolution_runbook: RB-008
+resolution_outcome: resolved
 ---
 
 ## Summary

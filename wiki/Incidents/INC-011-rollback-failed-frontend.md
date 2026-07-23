@@ -16,6 +16,9 @@ tags:
   - critical
   - prod
   - payments
+error_family: unknown
+resolution_runbook: RB-006
+resolution_outcome: partial
 ---
 
 ## Summary

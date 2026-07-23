@@ -3,9 +3,10 @@ FastAPI persistent service — loads LlamaIndex, ChromaDB, and Ollama once at st
 Alerts hit a warm index. No cold-start penalty per request.
 
 Endpoints:
-    POST /alert          — fingerprint an alert, return a grounded recommendation
-    GET  /health         — ChromaDB + Ollama status
-    POST /ingest/refresh — re-index changed docs
+    POST /alert                        — fingerprint an alert, return a grounded recommendation
+    POST /cards/{correlation_id}/feedback — record an ops decision on a card
+    GET  /health                       — ChromaDB + Ollama status
+    POST /ingest/refresh                — re-index changed docs
 
 Run:
     uvicorn src.server:app --host 127.0.0.1 --port 8000
@@ -14,15 +15,17 @@ Run:
 import time
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from src.alerts import SplunkAlert
+from src.card import RecommendationCard
 
-# ponytail: heavy imports (LlamaIndex, ChromaDB) deferred to lifespan/endpoints
-# to avoid blocking module import. Only stdlib + fastapi + pydantic at top level.
+# ponytail: heavy imports (LlamaIndex, ChromaDB, retrieval/scoring) deferred to
+# lifespan/endpoints to avoid blocking module import. src.card/src.alerts are
+# lightweight (pydantic models + stdlib only) and safe at top level.
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s", datefmt="%H:%M:%S")
 logger = logging.getLogger("llmkb2")
@@ -52,67 +55,35 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="LLMKB2 — AIOps Runbook Assistant", lifespan=lifespan)
 
 
-# --- Models ---
-
-class Citation(BaseModel):
-    doc_id: str
-    doc_type: str
-    section: str
-    service: str
-    score: float
-    score_explain: Optional[dict[str, Any]] = None
-
-
-def _citations(nodes) -> list[Citation]:
-    return [
-        Citation(
-            doc_id=n.node.metadata.get("id", "?"),
-            doc_type=n.node.metadata.get("doc_type", "?"),
-            section=n.node.metadata.get("section_name", "?"),
-            service=n.node.metadata.get("service", "?"),
-            score=round(n.score or 0, 4),
-            score_explain=n.node.metadata.get("_score_explain"),
-        )
-        for n in nodes[:8]
-    ]
-
-
 # --- Endpoints ---
 
-class FingerprintInfo(BaseModel):
-    signature_id: str
-    error_family: str
-    root_frame: Optional[str] = None
-
-
-class AlertResponse(BaseModel):
-    fingerprint: FingerprintInfo
-    query: str
-    answer: str
-    citations: list[Citation]
-    latency_ms: int
-    cached: bool = False
-    hit_count: int = 0
-
-
-@app.post("/alert", response_model=AlertResponse)
-async def alert_endpoint(alert: SplunkAlert):
+@app.post("/alert", response_model=RecommendationCard)
+async def alert_endpoint(alert: SplunkAlert, generation: Optional[bool] = None):
     """
     Demo alert intake — accepts a synthetic Splunk-webhook-shaped alert
-    (see src/alerts.py and data/sample_alerts/*.json), fingerprints it,
-    and returns a grounded recommendation. Stands in for the real
-    Splunk/ITRS event intake API until that integration is approved.
+    (see src/alerts.py and data/sample_alerts/*.json), fingerprints it, and
+    returns a RecommendationCard. Stands in for the real Splunk/ITRS event
+    intake API until that integration is approved.
+
+    `generation` query param overrides config/card.yaml's generation.enabled
+    default for this request only (E3) — omit to use the config default.
 
     An identical recurring incident (same fingerprint signature_id) is served
-    from src/recommendation_cache.py instead of re-running retrieval + LLM
-    generation — see that module's docstring.
+    from src/recommendation_cache.py instead of re-running retrieval +
+    scoring + LLM phrasing — see that module's docstring. Note: a cache hit
+    returns whatever was cached regardless of this request's `generation`
+    value (the cached card was already assembled once, under whatever
+    generation setting was active then).
     """
-    from src.alerts import alert_to_query
+    import uuid
+
+    from src.alerts import build_alert_context
     from src.fingerprint import compute_fingerprint
-    from src.query import build_query_engine
+    from src.recommendation import build_recommendation_card, apply_generation, GENERATION_ENABLED_DEFAULT
     from src import recommendation_cache
 
     start = time.perf_counter()
+    correlation_id = str(uuid.uuid4())
 
     fp = compute_fingerprint(
         raw_text=alert.result.message,
@@ -120,52 +91,97 @@ async def alert_endpoint(alert: SplunkAlert):
         environment=alert.result.environment,
         stack_trace=alert.result.stack_trace,
     )
-    fp_info = FingerprintInfo(
-        signature_id=fp.signature_id,
-        error_family=fp.error_family,
-        root_frame=fp.root_frame,
-    )
+    alert_context = build_alert_context(alert, fp)
 
     cached = recommendation_cache.get_cached(fp.signature_id)
     if cached is not None:
         elapsed = int((time.perf_counter() - start) * 1000)
         logger.info(f"[alert] {alert.search_name} | family={fp.error_family} | CACHE HIT #{cached.hit_count} | {elapsed}ms")
-        return AlertResponse(
-            fingerprint=fp_info,
-            query=cached.query,
-            answer=cached.answer,
-            citations=[Citation(**c) for c in cached.citations],
-            latency_ms=elapsed,
-            cached=True,
-            hit_count=cached.hit_count,
-        )
+        cached_card = RecommendationCard.model_validate_json(cached.card_json)
+        return cached_card.model_copy(update={"correlation_id": correlation_id})
 
-    query_text = alert_to_query(alert, fingerprint=fp)
-
-    engine = build_query_engine(top_k=8, service=alert.result.service)
-    response = engine.query(query_text)
-    answer = str(response)
-    citations = _citations(response.source_nodes)
+    use_generation = GENERATION_ENABLED_DEFAULT if generation is None else generation
+    card = build_recommendation_card(alert, fp, alert_context, correlation_id=correlation_id)
+    if use_generation:
+        card = apply_generation(card)
 
     recommendation_cache.store(
         signature_id=fp.signature_id,
         error_family=fp.error_family,
         service=alert.result.service,
-        query=query_text,
-        answer=answer,
-        citations=[c.model_dump() for c in citations],
+        card_json=card.model_dump_json(),
     )
 
     elapsed = int((time.perf_counter() - start) * 1000)
-    logger.info(f"[alert] {alert.search_name} | family={fp.error_family} | {elapsed}ms")
+    logger.info(f"[alert] {alert.search_name} | family={fp.error_family} | band={card.confidence.band} | {elapsed}ms")
 
-    return AlertResponse(
-        fingerprint=fp_info,
-        query=query_text,
-        answer=answer,
-        citations=citations,
-        latency_ms=elapsed,
-    )
+    return card
+
+
+class FeedbackRequest(BaseModel):
+    """
+    Echoes the card fields feedback.db needs (signature_id, error_family,
+    recommended_runbook) — the client already has these from the /alert
+    response; there is no server-side "cards by correlation_id" store to look
+    them up from (correlation_id is a fresh UUID per /alert call, not
+    persisted anywhere retrievable by itself — introducing one would mean a
+    knowledge-plane lookup service just to support the decision plane, which
+    R6 asks to keep separate).
+    """
+    signature_id: str
+    error_family: Optional[str] = None
+    recommended_runbook: Optional[str] = None
+    decision: str
+    actor: str
+    comment: Optional[str] = None
+    edited_action: Optional[str] = None
+
+
+@app.post("/cards/{correlation_id}/feedback")
+async def submit_feedback(correlation_id: str, req: FeedbackRequest):
+    """
+    Record an ops decision (accept/edit/reject/escalate/kb_gap) on a card.
+    Persists to feedback.db (append-only, G1-G4) and routes to the configured
+    TicketClient (H) — 'noop' by default, logs only, no network call.
+    """
+    from src.feedback import record_feedback, FeedbackValidationError
+    from src.ticket_client import get_ticket_client
+
+    try:
+        record = record_feedback(
+            correlation_id=correlation_id,
+            signature_id=req.signature_id,
+            error_family=req.error_family,
+            recommended_runbook=req.recommended_runbook,
+            decision=req.decision,
+            actor=req.actor,
+            comment=req.comment,
+            edited_action=req.edited_action,
+        )
+    except FeedbackValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    client = get_ticket_client()
+    if req.decision in ("accept", "edit", "reject", "escalate"):
+        summary = f"[{req.decision}] by {req.actor}"
+        if req.comment:
+            summary += f": {req.comment}"
+        if req.decision == "edit" and req.edited_action:
+            summary += f" | edited action: {req.edited_action}"
+        client.add_comment(req.signature_id, summary)
+    elif req.decision == "kb_gap":
+        client.create_kb_gap({
+            "correlation_id": correlation_id,
+            "signature_id": req.signature_id,
+            "error_family": req.error_family,
+            "recommended_runbook": req.recommended_runbook,
+            "actor": req.actor,
+            "comment": req.comment,
+        })
+
+    logger.info(f"[feedback] correlation_id={correlation_id} decision={req.decision} actor={req.actor}")
+
+    return {"status": "recorded", "id": record.id, "decided_at": record.decided_at}
 
 
 @app.get("/health")

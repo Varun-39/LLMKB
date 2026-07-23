@@ -16,6 +16,9 @@ tags:
   - high
   - prod
   - api
+error_family: node-notready
+resolution_runbook: RB-007
+resolution_outcome: resolved
 ---
 
 ## Summary

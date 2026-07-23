@@ -13,6 +13,9 @@ tags:
   - memory
   - messaging
   - backpressure
+error_family: unknown
+resolution_runbook: RB-013
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -16,6 +16,9 @@ tags:
   - database
   - critical
   - prod
+error_family: unknown
+resolution_runbook: RB-005
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -14,6 +14,9 @@ tags:
   - token
   - runner
   - authentication
+error_family: unknown
+resolution_runbook: RB-025
+resolution_outcome: resolved
 ---
 
 ## Summary

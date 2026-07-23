@@ -14,6 +14,9 @@ tags:
   - affinity
   - deployment-failure
   - prod
+error_family: pending-pods-resource-pressure
+resolution_runbook: RB-022
+resolution_outcome: resolved
 ---
 
 ## Summary

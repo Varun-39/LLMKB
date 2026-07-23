@@ -1,0 +1,20 @@
+# RecommendationCard field visibility and generation toggle.
+# Edit this file to change what renders — no code changes needed.
+
+fields:
+  show_do_not_do: true
+  show_escalate_if: true
+  show_risk: true
+  max_evidence_items: 8   # evidence items attached to the card (separate from
+                            # scoring's candidate_pool.final_top_k — that's how
+                            # many the SCORER ranks; this is how many the CARD shows)
+
+risk_defaults:
+  unknown_label: "unknown"   # risk.level when the recommended runbook has no risk_level frontmatter
+
+generation:
+  enabled: true              # master switch (E3). false = no LLM call, no Ollama
+                              # dependency, complete card still assembles from
+                              # retrieved content only.
+  model_version_tag: "llama3.1"   # recorded on the card as model_version when
+                                    # generation runs; null on the card when disabled

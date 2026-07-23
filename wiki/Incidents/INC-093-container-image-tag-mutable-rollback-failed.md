@@ -15,6 +15,9 @@ tags:
   - rollback
   - frontend
   - prod
+error_family: unknown
+resolution_runbook: RB-006
+resolution_outcome: resolved
 ---
 
 ## Summary

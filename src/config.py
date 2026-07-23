@@ -33,6 +33,16 @@ MANIFEST_DB = str(_project_root / os.getenv("MANIFEST_DB", "./manifest.db"))
 # --- SQLite Recommendation Cache (keyed by fingerprint signature_id) ---
 RECOMMENDATION_CACHE_DB = str(_project_root / os.getenv("RECOMMENDATION_CACHE_DB", "./recommendations.db"))
 
+# --- SQLite Outcomes store (cohort data for past_fix_success / confidence) ---
+# Derived from wiki/Incidents/ frontmatter — rebuildable at any time (R4).
+# Never hand-edit; re-run src.outcomes.build_outcomes_db() after any enrichment change.
+OUTCOMES_DB = str(_project_root / os.getenv("OUTCOMES_DB", "./outcomes.db"))
+
+# --- SQLite Feedback store (ops decisions on recommendation cards) ---
+# Append-only audit trail (R8) — NOT derived, this is a genuine system-of-record
+# (the decision plane, R6) and must never be wiped/rebuilt like the derived stores above.
+FEEDBACK_DB = str(_project_root / os.getenv("FEEDBACK_DB", "./feedback.db"))
+
 # --- Wiki Source (local editing surface, synced to MinIO) ---
 WIKI_SOURCE_DIR = str(_project_root / os.getenv("WIKI_SOURCE_DIR", "./wiki"))
 
@@ -64,7 +74,7 @@ def init_llama_index_settings():
         # ponytail: default context_window=-1 makes LlamaIndex request llama3.1's full
         # 131072-token context from Ollama, which doesn't fit an 8B model's KV cache in
         # 8GB VRAM and forces ~74% of inference onto CPU (10x+ slower). Our prompts
-        # (SRE_QA_PROMPT + top_k chunks) are a few thousand tokens at most — 8192 covers
+        # (card phrasing prompt + top_k chunks) are a few thousand tokens at most — 8192 covers
         # that with headroom while keeping the whole KV cache on GPU. Raise if chunk_size
         # or top_k grow enough to truncate context.
         context_window=8192,

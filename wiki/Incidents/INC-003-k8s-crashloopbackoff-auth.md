@@ -15,6 +15,9 @@ tags:
   - critical
   - prod
   - auth
+error_family: crashloopbackoff
+resolution_runbook: RB-007
+resolution_outcome: resolved
 ---
 code me give tit in the 
 ## Summary

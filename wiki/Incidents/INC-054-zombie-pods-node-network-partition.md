@@ -15,6 +15,9 @@ tags:
   - pods
   - critical
   - prod
+error_family: unknown
+resolution_runbook: RB-009
+resolution_outcome: resolved
 ---
 
 ## Summary

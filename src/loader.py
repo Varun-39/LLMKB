@@ -107,6 +107,15 @@ def normalize_metadata(raw_metadata: dict, object_key: str) -> dict:
     if "date" in raw_metadata:
         normalized["date"] = str(raw_metadata["date"])
 
+    # Error family / resolution outcome (incidents only — used for cohort-based
+    # confidence and error_family-filtered retrieval)
+    if "error_family" in raw_metadata:
+        normalized["error_family"] = str(raw_metadata["error_family"])
+    if "resolution_runbook" in raw_metadata:
+        normalized["resolution_runbook"] = str(raw_metadata["resolution_runbook"])
+    if "resolution_outcome" in raw_metadata:
+        normalized["resolution_outcome"] = str(raw_metadata["resolution_outcome"])
+
     return normalized
 
 

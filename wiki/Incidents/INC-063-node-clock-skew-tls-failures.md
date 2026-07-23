@@ -16,6 +16,9 @@ tags:
   - kubernetes
   - high
   - prod
+error_family: tls-cert-expiry
+resolution_runbook: RB-009
+resolution_outcome: resolved
 ---
 
 ## Summary

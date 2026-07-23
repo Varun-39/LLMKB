@@ -15,6 +15,9 @@ tags:
   - 502
   - api-gateway
   - prod
+error_family: connection-pool-exhausted
+resolution_runbook: RB-026
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -16,6 +16,9 @@ tags:
   - high
   - prod
   - reporting
+error_family: connection-pool-exhausted
+resolution_runbook: RB-005
+resolution_outcome: resolved
 ---
 
 ## Summary

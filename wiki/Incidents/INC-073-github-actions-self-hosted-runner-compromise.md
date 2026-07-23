@@ -15,6 +15,9 @@ tags:
   - build
   - moderate
   - prod
+error_family: disk-full
+resolution_runbook: RB-003
+resolution_outcome: resolved
 ---
 
 ## Summary

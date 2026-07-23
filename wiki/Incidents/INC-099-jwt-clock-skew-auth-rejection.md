@@ -14,6 +14,9 @@ tags:
   - ntp
   - auth-service
   - prod
+error_family: unknown
+resolution_runbook: RB-011
+resolution_outcome: resolved
 ---
 
 ## Summary

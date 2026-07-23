@@ -15,6 +15,9 @@ tags:
   - reporting-service
   - redis
   - prod
+error_family: unknown
+resolution_runbook: RB-021
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.fingerprint import compute_fingerprint, extract_root_frame, classify_error_family
+from src.fingerprint import compute_fingerprint, extract_root_frames, classify_error_family
 
 JAVA_TRACE = """\
 com.example.payment.PoolExhaustedException: timeout waiting for connection
@@ -56,10 +56,10 @@ def test_unknown_family_never_guesses():
 
 
 def test_root_frame_skips_framework_and_finds_application_code():
-    frame = extract_root_frame(JAVA_TRACE)
-    assert frame is not None
-    assert "com.zaxxer.hikari" not in frame
-    assert "com.example.payment.dao.OrderDao" in frame
+    frames = extract_root_frames(JAVA_TRACE)
+    assert frames, "expected at least one in-app frame"
+    assert not any("com.zaxxer.hikari" in f for f in frames), "framework frame leaked into root_frames"
+    assert any("com.example.payment.dao.OrderDao" in f for f in frames)
 
 
 def test_root_frame_wins_as_anchor_over_message_text():

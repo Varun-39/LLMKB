@@ -16,6 +16,9 @@ tags:
   - high
   - prod
   - reporting
+error_family: imagepullbackoff
+resolution_runbook: RB-006
+resolution_outcome: resolved
 ---
 
 ## Summary

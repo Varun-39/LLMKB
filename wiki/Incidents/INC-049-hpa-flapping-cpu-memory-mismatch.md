@@ -15,6 +15,9 @@ tags:
   - flapping
   - high
   - prod
+error_family: unknown
+resolution_runbook: RB-004
+resolution_outcome: resolved
 ---
 
 ## Summary

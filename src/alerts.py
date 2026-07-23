@@ -18,6 +18,7 @@ Splunk webhook alert actions POST:
     }
 """
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -82,3 +83,44 @@ def alert_to_query(alert: SplunkAlert, fingerprint: "Optional[Fingerprint]" = No
             extra.append(fingerprint.root_frame)
         query += " (" + " | ".join(extra) + ")"
     return query
+
+
+@dataclass
+class AlertContext:
+    """
+    Structured alert facts, carried alongside the rendered query string instead
+    of being re-derived from it downstream.
+
+    This generalizes the P0.1 fix (a scoring signal was reading `service` back
+    out of alert_to_query()'s rendered sentence via substring matching, and
+    collided with boilerplate wording — "...is reporting: ..." literally
+    contains the word "reporting", matching reporting-service regardless of
+    the actual alert's service). The rendered query string still exists and is
+    still used for embedding + BM25 — but any signal that needs a structured
+    alert fact (service, component, error_family, ...) reads it from here,
+    never by re-parsing that sentence.
+    """
+
+    service: str
+    component: str
+    host: str
+    environment: str
+    severity: str
+    signature_id: str
+    error_family: str
+    root_frame: Optional[str] = None
+
+
+def build_alert_context(alert: SplunkAlert, fingerprint: "Fingerprint") -> AlertContext:
+    """Compose the structured context from an alert + its computed fingerprint."""
+    r = alert.result
+    return AlertContext(
+        service=r.service.lower(),
+        component=r.component,
+        host=r.host,
+        environment=r.environment,
+        severity=r.severity,
+        signature_id=fingerprint.signature_id,
+        error_family=fingerprint.error_family,
+        root_frame=fingerprint.root_frame,
+    )

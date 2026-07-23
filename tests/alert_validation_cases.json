@@ -1,0 +1,44 @@
+[
+  {
+    "name": "connection-pool-exhausted-reporting",
+    "alert_file": "alert-connection-pool-exhausted.json",
+    "expected": ["INC-009", "RB-005"],
+    "note": "cohort 6/6 post-rescoping (P2/P3 session) - expect a confident, non-none band"
+  },
+  {
+    "name": "auth-crashloop-jwt",
+    "alert_file": "alert-auth-crashloop.json",
+    "expected": ["INC-003", "RB-007"],
+    "note": "crashloopbackoff/RB-007 cohort dropped to 1 post-rescoping - expect band=none is CORRECT, not a failure"
+  },
+  {
+    "name": "disk-full-db-volume",
+    "alert_file": "alert-disk-full-db-volume.json",
+    "expected": ["INC-006", "RB-003"],
+    "note": "cohort 8/8, unchanged by rescoping (all disk-full incidents use RB-003) - expect a confident band"
+  },
+  {
+    "name": "payment-oom",
+    "alert_file": "alert-payment-oom.json",
+    "expected": ["INC-001", "RB-001"],
+    "note": "oom/RB-001 cohort dropped to 1 post-rescoping - expect band=none is CORRECT, not a failure"
+  },
+  {
+    "name": "oom-api-gateway",
+    "alert_file": "alert-oom-api-gateway.json",
+    "expected": ["INC-002", "RB-002"],
+    "note": "oom/RB-002 cohort is 4 post-rescoping (above floor) - expect a confident band"
+  },
+  {
+    "name": "tls-cert-expiry-gateway",
+    "alert_file": "alert-tls-cert-expiry-gateway.json",
+    "expected": ["INC-024", "RB-011"],
+    "note": "tls-cert-expiry/RB-011 cohort is exactly 3, right at the floor - expect a non-none band, at the boundary"
+  },
+  {
+    "name": "dns-nxdomain-coredns",
+    "alert_file": "alert-dns-nxdomain-coredns.json",
+    "expected": ["INC-077", "RB-018"],
+    "note": "dns-nxdomain/RB-018 cohort is 2, below floor - expect band=none is CORRECT, not a failure"
+  }
+]

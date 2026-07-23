@@ -16,6 +16,9 @@ tags:
   - critical
   - prod
   - orders
+error_family: kafka-consumer-rebalance
+resolution_runbook: RB-014
+resolution_outcome: resolved
 ---
 
 ## Summary

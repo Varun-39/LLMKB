@@ -13,6 +13,9 @@ tags:
   - coredns
   - kubernetes
   - networking
+error_family: dns-nxdomain
+resolution_runbook: RB-018
+resolution_outcome: resolved
 ---
 
 ## Summary

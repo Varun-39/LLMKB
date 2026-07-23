@@ -17,6 +17,9 @@ tags:
   - critical
   - prod
   - security
+error_family: crashloopbackoff
+resolution_runbook: RB-012
+resolution_outcome: resolved
 ---
 
 ## Summary

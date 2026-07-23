@@ -14,6 +14,9 @@ tags:
   - restart-loop
   - auth-service
   - prod
+error_family: unknown
+resolution_runbook: RB-007
+resolution_outcome: resolved
 ---
 
 ## Summary

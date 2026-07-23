@@ -15,6 +15,9 @@ tags:
   - deployment
   - high
   - prod
+error_family: oom
+resolution_runbook: RB-006
+resolution_outcome: resolved
 ---
 
 ## Summary

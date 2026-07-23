@@ -14,6 +14,9 @@ tags:
   - consumer-group
   - rebalance
   - prod
+error_family: kafka-consumer-rebalance
+resolution_runbook: RB-010
+resolution_outcome: resolved
 ---
 
 ## Summary

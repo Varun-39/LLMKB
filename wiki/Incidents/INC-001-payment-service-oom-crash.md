@@ -16,6 +16,9 @@ tags:
   - critical
   - prod
   - payments
+error_family: oom
+resolution_runbook: RB-001
+resolution_outcome: resolved
 ---
 
 ## Summary

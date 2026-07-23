@@ -14,6 +14,9 @@ tags:
   - cardinality
   - oom
   - metrics
+error_family: oom
+resolution_runbook: RB-015
+resolution_outcome: resolved
 ---
 
 ## Summary

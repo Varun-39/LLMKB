@@ -1,0 +1,19 @@
+{
+  "sid": "scheduler__svc-monitoring__search__RMDa4c0e9f31b7d2688_at_1780014900_1",
+  "search_name": "AuthService-CrashLoopBackOff",
+  "app": "search",
+  "owner": "svc-monitoring",
+  "results_link": "https://splunk.internal/app/search/@go?sid=RMDa4c0e9f31b7d2688",
+  "result": {
+    "_time": "2026-07-21T09:44:12Z",
+    "host": "app-07",
+    "source": "/var/log/auth-service/app.log",
+    "sourcetype": "jee:app:log",
+    "component": "AuthService",
+    "service": "auth-service",
+    "environment": "prod",
+    "severity": "CRITICAL",
+    "message": "CrashLoopBackOff: Fatal: could not decode JWT_SIGNING_KEY — illegal base64 character",
+    "stack_trace": null
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "sid": "scheduler__svc-monitoring__search__RMD9c1e4a7b2f6d03_at_1780105500_1",
+  "search_name": "DNS-Resolution-Failure-Critical",
+  "app": "search",
+  "owner": "svc-monitoring",
+  "results_link": "https://splunk.internal/app/search/@go?sid=RMD9c1e4a7b2f6d03",
+  "result": {
+    "_time": "2026-07-22T05:11:20Z",
+    "host": "coredns-02",
+    "source": "/var/log/coredns/coredns.log",
+    "sourcetype": "jee:app:log",
+    "component": "CoreDNS",
+    "service": "coredns",
+    "environment": "prod",
+    "severity": "ERROR",
+    "message": "NXDOMAIN for payment-gateway.prod.svc.cluster.local from upstream 10.0.0.2",
+    "stack_trace": null
+  }
+}

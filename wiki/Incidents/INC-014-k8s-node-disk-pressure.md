@@ -17,6 +17,9 @@ tags:
   - high
   - prod
   - api
+error_family: node-disk-pressure
+resolution_runbook: RB-003
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -44,88 +44,10 @@ from src.manifest import (
 console = Console()
 
 
-# Low-value sections where LLM extraction is wasteful
-_SKIP_EXTRACT_SECTIONS = {"links", "revision-history", "preamble", "revision-history-0"}
-# Doc types where extraction is most valuable
-_EXTRACT_DOC_TYPES = {"incident", "runbook"}
-
-
-def _extract_llm_metadata(nodes: list) -> list:
-    """
-    Enrich nodes with LLM-generated keywords and a one-sentence summary.
-
-    Applied only to incident/runbook nodes (where metadata varies most) and
-    skips low-value sections. Uses the globally configured LLM (Ollama llama3.1).
-
-    Adds to each qualifying node's metadata:
-      - llm_keywords: comma-separated key terms extracted from the chunk
-      - llm_summary: one-sentence summary of the chunk
-
-    These are stored in ChromaDB metadata and can be used by retrieval signals.
-    The extraction is best-effort — individual failures are logged and skipped.
-    """
-    from llama_index.core import Settings
-
-    llm = Settings.llm
-    eligible = [
-        n for n in nodes
-        if n.metadata.get("doc_type") in _EXTRACT_DOC_TYPES
-        and n.metadata.get("section_name") not in _SKIP_EXTRACT_SECTIONS
-    ]
-
-    if not eligible:
-        return nodes
-
-    console.print(f"\n[bold blue]Step 3b:[/] LLM metadata extraction ({len(eligible)} nodes)...")
-    console.print("  [dim](skipping templates, low-value sections, and non-incident/runbook types)[/]")
-
-    for i, node in enumerate(eligible, 1):
-        text = node.get_content()[:2000]  # cap to avoid huge prompts
-        doc_id = node.metadata.get("id", "?")
-        section = node.metadata.get("section_name", "?")
-
-        prompt = (
-            f"Extract the 5 most important technical keywords from this SRE document section "
-            f"and write a one-sentence summary. Return ONLY:\n"
-            f"KEYWORDS: <comma-separated keywords>\n"
-            f"SUMMARY: <one sentence>\n\n"
-            f"Text:\n{text}"
-        )
-
-        try:
-            response = str(llm.complete(prompt)).strip()
-            keywords = ""
-            summary = ""
-
-            for line in response.splitlines():
-                if line.upper().startswith("KEYWORDS:"):
-                    keywords = line.split(":", 1)[1].strip()
-                elif line.upper().startswith("SUMMARY:"):
-                    summary = line.split(":", 1)[1].strip()
-
-            if keywords:
-                node.metadata["llm_keywords"] = keywords[:500]  # ChromaDB metadata limit
-                node.excluded_llm_metadata_keys = list(node.excluded_llm_metadata_keys or [])
-                if "llm_keywords" not in node.excluded_embed_metadata_keys:
-                    # Include in embeddings — this is the point
-                    pass
-
-            if summary:
-                node.metadata["llm_summary"] = summary[:500]
-
-            console.print(f"  [{i}/{len(eligible)}] {doc_id}::{section} → {len(keywords.split(',')) if keywords else 0} keywords")
-
-        except Exception as e:
-            console.print(f"  [{i}/{len(eligible)}] {doc_id}::{section} → [yellow]SKIP: {e}[/]")
-
-    return nodes
-
-
 def run_ingestion(
     force: bool = False,
     local: bool = False,
     prefix: str | None = None,
-    extract_metadata: bool = False,
 ) -> dict:
     """
     Run the full ingestion pipeline using LlamaIndex.
@@ -134,9 +56,6 @@ def run_ingestion(
         force: If True, re-index everything regardless of manifest state
         local: If True, load from local wiki/ instead of MinIO
         prefix: Optional MinIO prefix filter (e.g., "Incidents/")
-        extract_metadata: If True, run LLM-powered keyword/summary extraction
-                          per chunk (slow — adds ~1-3s per node via Ollama).
-                          Applied only to incident and runbook nodes to limit cost.
 
     Returns:
         Stats dict
@@ -205,10 +124,6 @@ def run_ingestion(
         doc_id = doc.metadata.get("id", doc.doc_id)
         doc_nodes = [n for n in all_nodes if n.metadata.get("id") == doc_id]
         console.print(f"  {doc.metadata.get('object_key', doc_id)} -> {len(doc_nodes)} nodes")
-
-    # --- Step 4b (optional): LLM metadata extraction ---
-    if extract_metadata:
-        all_nodes = _extract_llm_metadata(all_nodes)
 
     # --- Step 5: Delete old nodes for changed docs (delta mode) ---
     if not force:
@@ -295,8 +210,6 @@ def main():
                         help="Load from local wiki/ instead of MinIO")
     parser.add_argument("--prefix", type=str, default=None,
                         help="MinIO prefix filter (e.g., 'Incidents/')")
-    parser.add_argument("--extract-metadata", action="store_true",
-                        help="LLM-powered keyword/summary extraction per chunk (slow, ~1-3s/node)")
     args = parser.parse_args()
 
     # Initialize LlamaIndex with configured LLM/embedding models
@@ -313,7 +226,6 @@ def main():
         force=args.force,
         local=args.local,
         prefix=args.prefix,
-        extract_metadata=args.extract_metadata,
     )
 
     elapsed = time.perf_counter() - t0

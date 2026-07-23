@@ -15,6 +15,9 @@ tags:
   - api
   - high
   - prod
+error_family: high-cpu
+resolution_runbook: RB-008
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Brand tokens sampled from theoptimum.net (logo SVG + inline CSS) —
+     the real values, not the master-prompt's approximations. See report. */
+  --color-navy: #002448;
+  --color-navy-light: #0b3a63;
+  --color-navy-deep: #0a1c33;
+
+  --color-coral: #f68a39;
+  --color-coral-deep: #f46900;
+  --color-coral-tint: #fee4ce;
+
+  --color-ink: #16202e;
+  --color-muted: #5a6a85;
+  --color-hairline: #e2e8f1;
+  --color-page: #f7f9fc;
+  --color-surface: #ffffff;
+
+  --color-success: #4c8c6b;
+  --color-success-tint: #e7f1ec;
+  --color-caution: #e68a3c;
+  --color-caution-tint: #fbeee0;
+  --color-danger: #b23a2e;
+  --color-danger-tint: #f7e8e6;
+  --color-neutral: #7a8699;
+  --color-neutral-tint: #eef1f5;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100svh;
+}

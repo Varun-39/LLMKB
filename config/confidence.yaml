@@ -1,0 +1,55 @@
+# Confidence computation configuration (P3) — also read by P2's past_fix_success
+# signal (src/query.py), which shares count_as_success/count_as_attempt/
+# exclude_outcomes with the confidence computation itself so a cohort means the
+# same thing whether it's feeding a scoring signal or the confidence band.
+# Edit this file to tune thresholds — no code changes needed.
+
+# Score bands, in descending order of min_score. A cohort's score falls into
+# the highest band whose min_score it clears. Below every band's min_score
+# (and below min_cohort_size, regardless of score) => band 'none'.
+bands:
+  high:
+    min_score: 0.85
+  medium:
+    min_score: 0.60
+  low:
+    min_score: 0.35
+  # below low.min_score => band 'none'
+
+# Hard floor: cohort_size < min_cohort_size => band 'none', no action,
+# regardless of ratio. Two-for-two is not high confidence — the corpus today
+# has several error_family cohorts with only 1-2 prior incidents; this is what
+# keeps those from producing a confident-looking ratio off no real evidence.
+min_cohort_size: 3
+
+# resolution_outcome values excluded from BOTH numerator and denominator —
+# never counted as failures, never silently as successes.
+exclude_outcomes:
+  - unknown
+
+# resolution_outcome values that count as a successful resolution (numerator).
+count_as_success:
+  - resolved
+
+# resolution_outcome values that count as an attempt at all (denominator).
+# Anything not in this list AND not in exclude_outcomes would be an outcome
+# value nobody has defined a meaning for yet — treat as excluded, same as
+# unknown, rather than silently miscounting it either way.
+count_as_attempt:
+  - resolved
+  - partial
+  - failed
+
+# If true, a "success" must also match the specific resolution_runbook being
+# recommended (not just any successful resolution in the same error_family).
+# This is what makes past_fix_success mean "this specific runbook works", not
+# just "this error family is generally survivable".
+require_same_runbook: true
+
+# Card copy when band == 'none' (empty/insufficient evidence — R2).
+no_match_message: "No strong knowledge match found."
+
+# If true, 'low' band is treated the same as 'none' for card purposes (null
+# action) rather than a caveated recommendation. Team preference, not a
+# correctness requirement — 'low' is still a real signal, just weak.
+treat_low_as_no_action: false

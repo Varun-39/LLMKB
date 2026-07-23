@@ -16,6 +16,9 @@ tags:
   - traffic
   - high
   - prod
+error_family: high-cpu
+resolution_runbook: RB-006
+resolution_outcome: resolved
 ---
 
 ## Summary

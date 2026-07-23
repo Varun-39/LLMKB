@@ -14,6 +14,9 @@ tags:
   - crd
   - sync-loop
   - kubernetes
+error_family: high-cpu
+resolution_runbook: RB-031
+resolution_outcome: resolved
 ---
 
 ## Summary

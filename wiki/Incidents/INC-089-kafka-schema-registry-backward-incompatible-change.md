@@ -15,6 +15,9 @@ tags:
   - backward-compatibility
   - payment-service
   - prod
+error_family: unknown
+resolution_runbook: RB-014
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -17,6 +17,9 @@ tags:
   - high
   - prod
   - api
+error_family: oom
+resolution_runbook: RB-002
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -17,6 +17,9 @@ tags:
   - high
   - prod
   - reporting
+error_family: db-read-replica-lag
+resolution_runbook: RB-005
+resolution_outcome: resolved
 ---
 
 ## Summary

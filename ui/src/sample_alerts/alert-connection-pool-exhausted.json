@@ -1,0 +1,19 @@
+{
+  "sid": "scheduler__svc-monitoring__search__RMD5e8f2a1c9b4d0e77_at_1780012200_1",
+  "search_name": "ReportingDB-ConnectionPoolExhausted",
+  "app": "search",
+  "owner": "svc-monitoring",
+  "results_link": "https://splunk.internal/app/search/@go?sid=RMD5e8f2a1c9b4d0e77",
+  "result": {
+    "_time": "2026-07-21T09:12:03Z",
+    "host": "app-04",
+    "source": "/var/log/reporting-service/app.log",
+    "sourcetype": "jee:app:log",
+    "component": "ReportingService",
+    "service": "reporting-service",
+    "environment": "prod",
+    "severity": "ERROR",
+    "message": "HikariPool-1 - Connection is not available, request timed out after 30000ms",
+    "stack_trace": "com.zaxxer.hikari.pool.HikariPool$PoolInitializationException: Connection is not available\n\tat com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:197)\n\tat com.acme.reporting.export.ExportJobExecutor.runExport(ExportJobExecutor.java:88)\n\tat com.acme.reporting.export.ExportJobExecutor.lambda$submit$0(ExportJobExecutor.java:41)"
+  }
+}

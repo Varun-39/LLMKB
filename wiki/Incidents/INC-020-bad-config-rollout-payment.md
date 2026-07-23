@@ -16,6 +16,9 @@ tags:
   - critical
   - prod
   - payments
+error_family: connection-pool-exhausted
+resolution_runbook: RB-006
+resolution_outcome: resolved
 ---
 
 ## Summary

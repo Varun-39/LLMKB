@@ -15,6 +15,9 @@ tags:
   - rate-limit
   - high
   - prod
+error_family: tls-cert-expiry
+resolution_runbook: RB-011
+resolution_outcome: resolved
 ---
 
 ## Summary

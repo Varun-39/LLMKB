@@ -15,6 +15,9 @@ tags:
   - payment-service
   - prod
   - database
+error_family: unknown
+resolution_runbook: RB-030
+resolution_outcome: resolved
 ---
 
 ## Summary

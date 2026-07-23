@@ -14,6 +14,9 @@ tags:
   - ci-cd
   - infrastructure
   - lock
+error_family: terraform-state-lock
+resolution_runbook: RB-016
+resolution_outcome: resolved
 ---
 
 ## Summary

@@ -1,0 +1,6 @@
+# Ticket client selection. 'noop' (log-only stub) is the only implemented
+# value this session — space is left for a future 'live' value, but nothing
+# toward it is built yet. Do not add a 'live' branch without a real Jira
+# integration behind it.
+
+mode: noop

@@ -14,6 +14,9 @@ tags:
   - silent-failure
   - reporting-service
   - prod
+error_family: unknown
+resolution_runbook: RB-017
+resolution_outcome: resolved
 ---
 
 ## Summary

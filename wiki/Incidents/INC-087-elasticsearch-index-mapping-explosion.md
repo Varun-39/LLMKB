@@ -15,6 +15,9 @@ tags:
   - cluster
   - reporting-service
   - prod
+error_family: unknown
+resolution_runbook: RB-024
+resolution_outcome: resolved
 ---
 
 ## Summary

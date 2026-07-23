@@ -15,6 +15,9 @@ tags:
   - latency
   - high
   - prod
+error_family: high-cpu
+resolution_runbook: RB-005
+resolution_outcome: resolved
 ---
 
 ## Summary

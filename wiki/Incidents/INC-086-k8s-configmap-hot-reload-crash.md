@@ -15,6 +15,9 @@ tags:
   - race-condition
   - payment-service
   - prod
+error_family: crashloopbackoff
+resolution_runbook: RB-006
+resolution_outcome: resolved
 ---
 
 ## Summary

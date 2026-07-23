@@ -16,6 +16,9 @@ tags:
   - high
   - prod
   - payments
+error_family: high-cpu
+resolution_runbook: RB-004
+resolution_outcome: resolved
 ---
 
 ## Summary

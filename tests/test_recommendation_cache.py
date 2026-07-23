@@ -22,41 +22,39 @@ cache.RECOMMENDATION_CACHE_DB = str(_tmp_db)  # redirect get_connection() at the
 
 
 def main():
+    import json
     sig = "abc123def456"
 
     assert cache.get_cached(sig) is None, "expected a miss on an empty cache"
     print("OK  miss on empty cache")
 
-    citations = [{"doc_id": "INC-009", "doc_type": "incident", "section": "resolution",
-                  "service": "reporting-service", "score": 0.95, "score_explain": None}]
+    card_json = json.dumps({"recommended_action": "Terminate idle connections.", "evidence": []})
     cache.store(
         signature_id=sig, error_family="connection-pool-exhausted", service="reporting-service",
-        query="ReportingService is reporting a pool timeout", answer="Terminate idle connections.",
-        citations=citations,
+        card_json=card_json,
     )
     print("OK  store()")
 
     hit = cache.get_cached(sig)
     assert hit is not None, "expected a hit after store()"
     assert hit.hit_count == 1, f"expected hit_count=1, got {hit.hit_count}"
-    assert hit.answer == "Terminate idle connections."
-    assert hit.citations == citations
-    print(f"OK  hit #1: {hit.answer!r}")
+    assert hit.card_json == card_json
+    print(f"OK  hit #1: {hit.card_json!r}")
 
     hit2 = cache.get_cached(sig)
     assert hit2.hit_count == 2, f"expected hit_count=2, got {hit2.hit_count}"
     print(f"OK  hit #2: hit_count now {hit2.hit_count}")
 
-    # Re-storing under the same signature updates the answer without resetting hit_count.
+    # Re-storing under the same signature updates the card without resetting hit_count.
+    updated_json = json.dumps({"recommended_action": "Updated guidance.", "evidence": []})
     cache.store(
         signature_id=sig, error_family="connection-pool-exhausted", service="reporting-service",
-        query="ReportingService is reporting a pool timeout", answer="Updated guidance.",
-        citations=citations,
+        card_json=updated_json,
     )
     hit3 = cache.get_cached(sig)
-    assert hit3.answer == "Updated guidance.", "expected re-store to overwrite the answer"
+    assert hit3.card_json == updated_json, "expected re-store to overwrite the card"
     assert hit3.hit_count == 3, f"expected hit_count=3 (not reset by re-store), got {hit3.hit_count}"
-    print(f"OK  re-store overwrites answer, preserves hit_count ({hit3.hit_count})")
+    print(f"OK  re-store overwrites card, preserves hit_count ({hit3.hit_count})")
 
     cache.reset_cache()
     assert cache.get_cached(sig) is None, "expected a miss after reset_cache()"

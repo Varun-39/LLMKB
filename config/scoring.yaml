@@ -2,13 +2,42 @@
 # Edit this file to tune ranking behavior — no code changes needed.
 # Loaded once at startup.
 
-# Weights for combining retrieval signals (should sum to ~1.0)
-weights:
-  rrf: 0.55               # rank fusion agreement between dense and BM25
-  exact_match: 0.13       # query text found in node text (BM25 / token overlap)
-  metadata_match: 0.13    # service in query matches node metadata
-  section_relevance: 0.09 # section type matches query intent
-  doc_type_priority: 0.10 # source authority tier (runbook > incident > system > informal)
+# --- Scoring signals (deck's 4, plus section_relevance retained as an auxiliary
+# 5th — orthogonal to the deck's signals, useful for CLI/manual queries where
+# "does this section match what the user is asking for" still matters).
+# Weights are flat/equal across the deck's 4 core signals deliberately — real
+# weighting is a tuning decision made later against acceptance data, not invented
+# here. `enabled: false` fully switches a signal off (contributes 0, weight
+# reallocated to nothing — a disabled signal is not "assumed neutral", it's off).
+signals:
+  exact_error_match:
+    weight: 0.25    # structured error_family match (candidate vs alert), else IDF text overlap fallback
+    enabled: true
+  component_match:
+    weight: 0.25    # alert's structured service/component vs candidate's service metadata
+    enabled: true
+  source_quality:
+    weight: 0.25    # doc_type authority tier — see source_quality_tiers below
+    enabled: true
+  past_fix_success:
+    weight: 0.25    # outcomes.db cohort ratio for this candidate's associated runbook
+    enabled: true
+    neutral_value: 0.5   # contributed when cohort_size < confidence.yaml's min_cohort_size —
+                          # a rare error family is UNKNOWN, not bad or good. Never 0 (penalty)
+                          # or 1 (undeserved boost).
+  section_relevance:
+    weight: 0.10    # auxiliary, NOT one of the deck's 4 — additive on top, not part of the
+                     # 4-signal 1.0 split above. Matches section type to query intent
+                     # (still meaningful for manual/CLI queries with no structured alert).
+    enabled: true
+
+# RRF (dense+BM25 fusion) is deliberately NOT a signal here — it lives entirely in
+# the recall stage (src/retrieval.py's hybrid_candidates()), which builds the
+# candidate POOL. It must not also decide final order: that would entangle
+# "did we find the right doc" with "did we rank it correctly", making a miss
+# hard to attribute to either stage. rrf_score is still recorded per-candidate
+# in _score_explain for audit/debugging, it just no longer contributes to
+# `combined`.
 
 # Penalty for low-information sections
 penalties:
@@ -20,18 +49,56 @@ penalties:
     - additional-notes
   penalty_amount: 0.20    # subtract this from final score
 
-# Retrieval / routing thresholds
+# Retrieval / routing thresholds. candidate_multiplier + min_candidate_count
+# ARE the recall-pool-sizing config surface (top_k * multiplier, floored at
+# min_candidate_count) — deliberately not duplicated under a second
+# "candidate_pool.recall_top_k" key; that would be two config knobs for one
+# concept. candidate_pool.final_top_k below covers the OTHER half (how many
+# make it onto the card).
 thresholds:
   id_lookup_regex: "^[A-Z]{2,5}-\\d{1,4}$"  # detects INC-003, RB-001, SYS-002
-  candidate_multiplier: 8  # retrieve top_k * this, then rerank down to top_k
-  min_candidate_count: 50  # floor for reranking depth
-  rrf_k: 60               # reciprocal rank fusion constant
+  candidate_multiplier: 8  # retrieve top_k * this, then score down to top_k
+  min_candidate_count: 50  # floor for scoring depth
+  rrf_k: 60               # reciprocal rank fusion constant (recall stage only)
+
+candidate_pool:
+  final_top_k: 8   # number of evidence items that reach the card (was a bare
+                    # "top_k=8" default scattered across function signatures)
+
+# Retrieval filter strictness (C1). strict = ChromaDB WHERE-equality filter on
+# the dense retriever (excludes non-matches from the DENSE half of the pool
+# entirely — BM25's full-corpus scan is never filtered, same asymmetry the
+# existing service filter already has). soft = don't filter the candidate pool
+# at all; let the matching scoring signal (component_match / exact_error_match)
+# reward matches instead. Default soft for error_family specifically because
+# enrichment coverage is incomplete (47/100 incidents are "unknown" — strict
+# filtering on a field with real gaps would silently starve the pool for nearly
+# half of alerts). service coverage is complete, so strict is safe there.
+retrieval_filters:
+  service_filter_mode: strict
+  error_family_filter_mode: soft
 
 # Scoring behavior
 scoring:
   normalize_rrf: true
   minmax_normalize_final: false
   attach_explanations: true
+
+# Plain-language "why this matched" (R7). Every evidence item gets one of
+# these composed from whichever signals actually fired for it — a signal that
+# didn't fire contributes nothing to the phrase, never boilerplate claiming a
+# match that didn't happen.
+explanations:
+  enabled: true
+  templates:
+    exact_error_match_family: "Same error family ({error_family})"
+    exact_error_match_text: "Matching error text (\"{matched_terms}\")"
+    component_match: "Same component ({component})"
+    source_quality: "Source is an approved {doc_type}"
+    past_fix_success: "{prior_success_n} of {prior_total_n} prior incidents resolved this way"
+    past_fix_success_neutral: "Too few prior incidents ({prior_total_n}) to judge past success"
+    section_relevance: "This section ({section_name}) matches what you're asking"
+    no_signals_fired: "Retrieved by semantic similarity; no strong match signal fired"
 
 # Query intent keywords
 intent_keywords:
@@ -72,7 +139,10 @@ info_sections:
   - diagnosis
   - symptoms
 
-# Known service names (for metadata matching)
+# Known service names (for component_match's manual/CLI text-detection fallback
+# only — the alert path uses the structured AlertContext.service directly and
+# never consults this list for matching, only for validating the structured
+# value is a recognized service).
 known_services:
   - payment-gateway
   - payment-service
@@ -83,12 +153,16 @@ known_services:
   - general
   - all
 
-# Source authority tier — maps doc_type to a 0.0–1.0 priority score.
+# Source authority tier — maps doc_type to a 0.0-1.0 priority score, used by the
+# source_quality signal. Kept as all 7 doc_types the corpus actually has
+# (deviates from the 3-tier example layout: governance/vendor-note/template/
+# unknown docs still need a defensible score or they'd silently fall back to a
+# hardcoded default deep in code, which is exactly what config-first forbids).
 # Priority 1 (runbooks/SOPs): exact, pre-approved action steps.
 # Priority 2 (incidents): recent historical context, post-mortems.
 # Priority 3 (system/governance): architecture docs, baseline understanding.
 # Priority 4 (vendor-note, unknown): informal clues of last resort.
-doc_type_priority:
+source_quality_tiers:
   runbook: 1.00
   incident: 0.75
   system: 0.50
@@ -103,10 +177,10 @@ doc_coherence:
   boost_per_chunk: 0.03  # score bonus per chunk count
   max_boost: 0.15        # cap on total coherence boost
 
-# Cross-encoder reranker — runs BEFORE multi-signal scoring.
-# Provides semantic relevance that heuristic signals cannot capture.
-# The reranker re-evaluates query-document pairs using a cross-encoder model,
-# then the multi-signal scorer applies SRE-domain signals on top.
+# Cross-encoder reranker — narrows candidates BEFORE multi-signal scoring
+# (recall-narrowing, not a final ranking step — see the P0 architecture review
+# for why: cross-encoders trade away the plain-language explainability R7
+# requires, so they must never be the thing that decides displayed order).
 reranker:
   enabled: false
   model: "cross-encoder/ms-marco-MiniLM-L-2-v2"  # fast, good for CPU

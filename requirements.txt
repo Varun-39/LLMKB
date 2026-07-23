@@ -1,5 +1,5 @@
 # LLMKB — pinned to versions verified working in the current environment
-# (Python 3.13.9). Reproduce with: python -m src.query "INC-009" --no-generate
+# (Python 3.13.9). Verify with: python -m tests.evaluate / python -m tests.evaluate_alert_path
 
 # --- Core pipeline: config, loading, chunking, indexing, retrieval ---
 python-dotenv==1.2.2

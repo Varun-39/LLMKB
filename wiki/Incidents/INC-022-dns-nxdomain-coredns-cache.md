@@ -14,6 +14,9 @@ tags:
   - coredns
   - networking
   - critical
+error_family: dns-nxdomain
+resolution_runbook: RB-018
+resolution_outcome: resolved
 ---
 
 ## Summary

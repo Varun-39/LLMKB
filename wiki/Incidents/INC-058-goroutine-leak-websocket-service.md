@@ -16,6 +16,9 @@ tags:
   - memory
   - high
   - prod
+error_family: oom
+resolution_runbook: RB-002
+resolution_outcome: resolved
 ---
 
 ## Summary

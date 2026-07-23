@@ -14,6 +14,9 @@ tags:
   - kubernetes
   - stale-handle
   - io-error
+error_family: unknown
+resolution_runbook: RB-003
+resolution_outcome: resolved
 ---
 
 ## Summary

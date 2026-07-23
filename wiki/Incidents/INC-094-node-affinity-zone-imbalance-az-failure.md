@@ -15,6 +15,9 @@ tags:
   - multi-az
   - api-gateway
   - prod
+error_family: unknown
+resolution_runbook: RB-019
+resolution_outcome: resolved
 ---
 
 ## Summary
