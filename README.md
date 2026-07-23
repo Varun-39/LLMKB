@@ -1,10 +1,9 @@
   # AI Runbook Assistant
 
-  *(repo name: LLMKB — kept for continuity; the product itself is the pitch deck's "AI Runbook Assistant for Incident Response.")*
+  
 
   Turns monitoring alerts into evidence-backed corrective action recommendations, reducing Splunk-to-Jira analysis time from ~10-15 minutes of manual lookup to seconds. A structured operational knowledge base (incidents, runbooks, system docs) powered by a Retrieval-Augmented Generation pipeline using **LlamaIndex**, **Ollama**, **MinIO**, and **ChromaDB** — surfaced to on-call ops as a grounded **recommendation card**, not a chat answer.
 
-  This is the Phase 1 build described in [Optimum Solutions' "AI Runbook Assistant for Incident Response" deck](#model-story-pitch-deck-vs-this-build): recommendation-only, no autonomous execution. See [Known Gaps vs. the Pitch Deck](#known-gaps-vs-the-pitch-deck) for what the deck claims that this build does not yet implement.
 
   Fully local. No API keys required for the core `/alert` path. No data leaves your machine.
 
